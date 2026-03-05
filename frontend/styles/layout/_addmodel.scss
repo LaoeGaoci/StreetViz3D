@@ -1,0 +1,58 @@
+.streetviz-addmodel {
+    height: 300px;
+}
+
+.streetviz-addmodel .p-sidebar-content {
+    padding: 0;
+}
+
+.p-sidebar-header {
+    padding: 0px;
+}
+
+.panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 12px;
+}
+
+.panel-header .p-tabmenu .p-tabmenu-nav li {
+    margin-right: 50px;
+}
+
+.panel-close {
+    cursor: pointer;
+    font-size: 20px;
+}
+
+.model-row {
+    display: flex;
+    gap: 16px;
+    padding: 12px;
+}
+
+.model-row {
+    display: flex;
+    gap: 1.5rem;
+    padding: 0.5rem 1rem;
+    overflow-x: auto;
+}
+
+.model-card {
+    width: 200px;
+    min-width: 130px;
+    cursor: pointer;
+    text-align: center;
+}
+
+.model-card img {
+    width: 100%;
+    height: 100px;
+    object-fit: contain;
+}
+
+.model-title {
+    font-size: 12px;
+    margin-top: 6px;
+}

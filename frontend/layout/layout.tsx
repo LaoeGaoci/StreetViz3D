@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useContext, useRef } from 'react';
+import React, { useContext, useRef, useState } from 'react';
 import { classNames } from 'primereact/utils';
 import { LayoutContext } from './context/layoutcontext';
 import { PrimeReactContext } from 'primereact/api';
@@ -8,6 +8,9 @@ import { PrimeReactContext } from 'primereact/api';
 import AppSidebar from './AppSidebar';
 import AppTopbar from './AppTopbar';
 import AppConfig from './AppConfig';
+import AddModelPanel from './AddModelPanel';
+import { Button } from 'primereact/button';
+
 
 import { ChildContainerProps, AppTopbarRef } from '@/types';
 
@@ -17,7 +20,7 @@ const Layout = ({ children }: ChildContainerProps) => {
 
     const topbarRef = useRef<AppTopbarRef>(null);
     const sidebarRef = useRef<HTMLDivElement>(null);
-
+    const [showAddModel, setShowAddModel] = useState(false);
     const containerClass = classNames('layout-wrapper', {
         'layout-overlay': layoutConfig.menuMode === 'overlay',
         'layout-static': layoutConfig.menuMode === 'static',
@@ -33,15 +36,25 @@ const Layout = ({ children }: ChildContainerProps) => {
             <AppTopbar ref={topbarRef} />
 
             {/* Sidebar */}
-            <div ref={sidebarRef} className="layout-sidebar">
-                <AppSidebar />
+            <div className='layout-sideTool'>
+                <div ref={sidebarRef} className="layout-sidebar">
+                    <AppSidebar />
+                </div>
+                <Button
+                    label="Add Model"
+                    icon="pi pi-plus"
+                    className="p-button-primary"
+                    onClick={() => setShowAddModel(true)}
+                />
             </div>
-
             {/* Main */}
             <div className="layout-main-container">
                 {children}
             </div>
-
+            <AddModelPanel
+                visible={showAddModel}
+                onHide={() => setShowAddModel(false)}
+            />
             {/* Settings */}
             <AppConfig />
 
