@@ -18,7 +18,7 @@
 	"nodes":[
 		{
 			"mesh":0,
-			"name":"SPW_Urban_Road Props_Street Light_02",
+			"name":"SPB_Mosque",
 			"rotation":[
 				0.7071068286895752,
 				0,
@@ -39,19 +39,19 @@
 					]
 				}
 			},
-			"name":"SPW_Urban_Road Props_01",
+			"name":"SPB_Mosque",
 			"pbrMetallicRoughness":{
 				"baseColorTexture":{
 					"index":0
 				},
 				"metallicFactor":0,
-				"roughnessFactor":0.5527864098548889
+				"roughnessFactor":0.2256259024143219
 			}
 		}
 	],
 	"meshes":[
 		{
-			"name":"Cube.042",
+			"name":"Cube.096",
 			"primitives":[
 				{
 					"attributes":{
@@ -74,69 +74,69 @@
 	"images":[
 		{
 			"mimeType":"image/png",
-			"name":"SPW_Urban_Road Props_01",
-			"uri":"SPW_Urban_Road%20Props_01.png"
+			"name":"SPB_Mosque",
+			"uri":"SPB_Mosque.png"
 		}
 	],
 	"accessors":[
 		{
 			"bufferView":0,
 			"componentType":5126,
-			"count":304,
+			"count":8277,
 			"max":[
-				2.7062129974365234,
-				0.23461270332336426,
-				4.440892098500626e-16
+				12.40000057220459,
+				8,
+				9.811368499867967e-07
 			],
 			"min":[
-				-2.7062129974365234,
-				-0.23461385071277618,
-				-8.169967651367188
+				-12.40000057220459,
+				-7.173526287078857,
+				-11.416569709777832
 			],
 			"type":"VEC3"
 		},
 		{
 			"bufferView":1,
 			"componentType":5126,
-			"count":304,
+			"count":8277,
 			"type":"VEC3"
 		},
 		{
 			"bufferView":2,
 			"componentType":5126,
-			"count":304,
+			"count":8277,
 			"type":"VEC2"
 		},
 		{
 			"bufferView":3,
 			"componentType":5123,
-			"count":492,
+			"count":12702,
 			"type":"SCALAR"
 		}
 	],
 	"bufferViews":[
 		{
 			"buffer":0,
-			"byteLength":3648,
+			"byteLength":99324,
 			"byteOffset":0,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":3648,
-			"byteOffset":3648,
+			"byteLength":99324,
+			"byteOffset":99324,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":2432,
-			"byteOffset":7296,
+			"byteLength":66216,
+			"byteOffset":198648,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":984,
-			"byteOffset":9728,
+			"byteLength":25404,
+			"byteOffset":264864,
 			"target":34963
 		}
 	],
@@ -148,8 +148,8 @@
 	],
 	"buffers":[
 		{
-			"byteLength":10712,
-			"uri":"SPW_Urban_Road%20Props_Street%20Light_02.bin"
+			"byteLength":290268,
+			"uri":"SPB_Mosque.bin"
 		}
 	]
 }

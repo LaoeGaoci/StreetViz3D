@@ -18,7 +18,7 @@
 	"nodes":[
 		{
 			"mesh":0,
-			"name":"SPW_Urban_Road Props_Street Light_01",
+			"name":"SPW_Urban_Road Props_Barrier 01_Part 02",
 			"rotation":[
 				0.7071068286895752,
 				0,
@@ -39,7 +39,7 @@
 					]
 				}
 			},
-			"name":"SPW_Urban_Road Props_01",
+			"name":"SPW_Urban_Road",
 			"pbrMetallicRoughness":{
 				"baseColorTexture":{
 					"index":0
@@ -51,7 +51,7 @@
 	],
 	"meshes":[
 		{
-			"name":"Cube.035",
+			"name":"Cube.1574",
 			"primitives":[
 				{
 					"attributes":{
@@ -74,69 +74,69 @@
 	"images":[
 		{
 			"mimeType":"image/png",
-			"name":"SPW_Urban_Road Props_01",
-			"uri":"SPW_Urban_Road%20Props_01.png"
+			"name":"SPW_Urban_Road Props_03",
+			"uri":"SPW_Urban_Road%20Props_03.png"
 		}
 	],
 	"accessors":[
 		{
 			"bufferView":0,
 			"componentType":5126,
-			"count":176,
+			"count":56,
 			"max":[
-				0.12393444031476974,
-				0.23461270332336426,
-				4.440892098500626e-16
+				5.000001907348633,
+				0.5,
+				2.1855694143368964e-08
 			],
 			"min":[
-				-2.7062129974365234,
-				-0.23461344838142395,
-				-8.169939041137695
+				-5.000001907348633,
+				-0.5,
+				-1.7000000476837158
 			],
 			"type":"VEC3"
 		},
 		{
 			"bufferView":1,
 			"componentType":5126,
-			"count":176,
+			"count":56,
 			"type":"VEC3"
 		},
 		{
 			"bufferView":2,
 			"componentType":5126,
-			"count":176,
+			"count":56,
 			"type":"VEC2"
 		},
 		{
 			"bufferView":3,
 			"componentType":5123,
-			"count":288,
+			"count":84,
 			"type":"SCALAR"
 		}
 	],
 	"bufferViews":[
 		{
 			"buffer":0,
-			"byteLength":2112,
+			"byteLength":672,
 			"byteOffset":0,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":2112,
-			"byteOffset":2112,
+			"byteLength":672,
+			"byteOffset":672,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":1408,
-			"byteOffset":4224,
+			"byteLength":448,
+			"byteOffset":1344,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":576,
-			"byteOffset":5632,
+			"byteLength":168,
+			"byteOffset":1792,
 			"target":34963
 		}
 	],
@@ -148,8 +148,8 @@
 	],
 	"buffers":[
 		{
-			"byteLength":6208,
-			"uri":"SPW_Urban_Road%20Props_Street%20Light_01.bin"
+			"byteLength":1960,
+			"uri":"SPW_Urban_Road_Props_Barrier_01_Part_02.bin"
 		}
 	]
 }

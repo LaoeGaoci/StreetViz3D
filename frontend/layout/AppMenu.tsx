@@ -24,7 +24,7 @@ const AppMenu = () => {
                         { label: 'Plants', icon: 'pi pi-image' },
                         { label: 'People', icon: 'pi pi-fw pi-user' },
                         { label: 'Signs', icon: 'pi pi-fw pi-flag' },
-                        { label: 'Fixtures', icon: 'pi pi-fw pi-bolt' }
+                        { label: 'Props', icon: 'pi pi-fw pi-bolt' }
                     ]
                 }
             ]
