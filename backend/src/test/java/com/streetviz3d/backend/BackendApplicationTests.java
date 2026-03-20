@@ -1,10 +1,10 @@
-package com.streetviz3d;
+package com.streetviz3d.backend;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest
-class Streetviz3dApplicationTests {
+class BackendApplicationTests {
 
     @Test
     void contextLoads() {

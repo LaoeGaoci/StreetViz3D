@@ -1,13 +1,13 @@
-package com.streetviz3d;
+package com.streetviz3d.backend;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
-public class Streetviz3dApplication {
+public class BackendApplication {
 
     public static void main(String[] args) {
-        SpringApplication.run(Streetviz3dApplication.class, args);
+        SpringApplication.run(BackendApplication.class, args);
     }
 
 }
