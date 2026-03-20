@@ -1,62 +1,90 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Sidebar } from 'primereact/sidebar';
 import { TabMenu } from 'primereact/tabmenu';
 import { ScrollPanel } from 'primereact/scrollpanel';
-import { Card } from 'primereact/card';
 import { Button } from 'primereact/button';
+import { Card } from 'primereact/card';
 
 interface Props {
     visible: boolean;
     onHide: () => void;
 }
 
-const modelData: Record<string, any[]> = {
-    "🚦Streets & Intersections": [
-        { name: "BRT Station", img: "/models/brt.png" },
-    ],
-    "🚧Traffic Control": [
-        { name: "Traffic Light", img: "/models/light.png" },
-    ],
-    "🚸Signs": [
-        { name: "Stop Sign", img: "/models/stop.png" },
-    ],
-    "🌳Plants": [
-        { name: "Tree", img: "/models/tree.png" },
-    ],
-    "🪑Fixtures": [
-        { name: "Bench", img: "/models/bench.png" },
-        { name: "Utility Pole", img: "/models/pole.png" },
-        { name: "Lamp Modern", img: "/models/lamp.png" }
-    ],
-    "🧍People": [
-        { name: "Pedestrian", img: "/models/person.png" }
-    ],
-    "🚲Bicycles": [
-        { name: "Bike", img: "/models/bike.png" }
-    ],
-    "🚗Vehicles": [
-        { name: "Car", img: "/models/car.png" },
-        { name: "Bus", img: "/models/bus.png" }
-    ],
-    "🏢Buildings": [
-        { name: "House", img: "/models/house.png" }
-    ]
-};
+interface ModelItem {
+    modelId: string;
+    modelName: string;
+    displayName: string;
+    modelPreview: string;
+}
+
+interface CategoryItem {
+    label: string;
+    type: string;
+}
+
+const categories: CategoryItem[] = [
+    { label: '🚦Streets & Intersections', type: 'Scene' },
+    { label: '🌳Plants', type: 'Plant' },
+    { label: '🪑Fixtures', type: 'Props' },
+    { label: '🚗Vehicles', type: 'Vehicle' },
+    { label: '🏢Buildings', type: 'Building' }
+];
+
+// 你的后端地址
+const API_BASE_URL = 'http://localhost:8080';
 
 export default function AddModelPanel({ visible, onHide }: Props) {
-
-    const categories = Object.keys(modelData);
-
-    const items = categories.map((c) => ({
-        label: c
-    }));
-
     const [activeIndex, setActiveIndex] = useState(0);
+    const [models, setModels] = useState<ModelItem[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string>('');
+
+    const items = useMemo(
+        () => categories.map((c) => ({ label: c.label })),
+        []
+    );
 
     const currentCategory = categories[activeIndex];
-    const models = modelData[currentCategory];
+    const currentType = currentCategory.type;
+
+    useEffect(() => {
+        if (!visible) return;
+
+        const fetchModels = async () => {
+            setLoading(true);
+            setError('');
+
+            try {
+                const response = await fetch(
+                    `${API_BASE_URL}/model/type?type=${encodeURIComponent(currentType)}`,
+                    {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    }
+                );
+
+                if (!response.ok) {
+                    throw new Error(`请求失败，状态码：${response.status}`);
+                }
+
+                const data: ModelItem[] = await response.json();
+                console.log('获取模型列表成功：', data);
+                setModels(data);
+            } catch (err) {
+                console.error('获取模型列表失败：', err);
+                setError('模型数据加载失败');
+                setModels([]);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchModels();
+    }, [visible, currentType]);
 
     return (
         <Sidebar
@@ -66,10 +94,7 @@ export default function AddModelPanel({ visible, onHide }: Props) {
             className="streetviz-addmodel"
             showCloseIcon={false}
         >
-
-            {/* Header Tabs */}
             <div className="panel-header">
-
                 <TabMenu
                     model={items}
                     activeIndex={activeIndex}
@@ -83,30 +108,51 @@ export default function AddModelPanel({ visible, onHide }: Props) {
                         onClick={onHide}
                     />
                 </div>
-
             </div>
 
-            {/* Model List */}
-            <ScrollPanel style={{ width: '100%', height: '140px' }}>
-
-                <div className="model-row">
-
-                    {models.map((m, i) => (
-                        <div key={i} className="model-card">
-
-                            <img src={m.img} alt={m.name} />
-
-                            <div className="model-title">
-                                {m.name}
-                            </div>
-
+            <ScrollPanel className="model-scroll-panel">
+                <div className="model-grid">
+                    {loading && (
+                        <div className="model-status">
+                            正在加载模型...
                         </div>
-                    ))}
+                    )}
 
+                    {!loading && error && (
+                        <div className="model-status error">
+                            {error}
+                        </div>
+                    )}
+
+                    {!loading && !error && models.length === 0 && (
+                        <div className="model-status">
+                            当前分类下暂无模型
+                        </div>
+                    )}
+
+                    {!loading &&
+                        !error &&
+                        models.map((m) => (
+                            <Card
+                                key={m.modelId}
+                                className="model-card"
+                                header={
+                                    <div className="model-image-wrapper">
+                                        <img
+                                            src={m.modelPreview}
+                                            alt={m.displayName}
+                                            className="model-image"
+                                        />
+                                    </div>
+                                }
+                            >
+                                <div className="model-title">
+                                    {m.displayName}
+                                </div>
+                            </Card>
+                        ))}
                 </div>
-
             </ScrollPanel>
-
         </Sidebar>
     );
 }
