@@ -2,7 +2,8 @@
 
 import React from 'react';
 import ModelContainer from '../../layout/ModelContainer';
+import { redirect } from 'next/navigation';
 
 export default function Page() {
-    return <ModelContainer />;
+    redirect('/auth/login');
 }

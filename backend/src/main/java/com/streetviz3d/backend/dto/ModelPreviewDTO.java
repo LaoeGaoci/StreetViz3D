@@ -1,5 +1,6 @@
 package com.streetviz3d.backend.dto;
 
+import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -14,4 +15,16 @@ public class ModelPreviewDTO {
     private String modelName;
     private String displayName;
     private String modelPreview;
+
+    @Data
+    public static class UpdatePasswordRequest {
+
+        private UUID userId;
+
+        @NotBlank(message = "旧密码不能为空")
+        private String oldPassword;
+
+        @NotBlank(message = "新密码不能为空")
+        private String newPassword;
+    }
 }
