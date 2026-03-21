@@ -75,7 +75,7 @@ const RegisterPage = () => {
                 localStorage.setItem('email', loginData.email);
             }
 
-            router.push('/');
+            router.push('/home');
         } catch (error: any) {
             toast.current?.show({
                 severity: 'error',
