@@ -1,9 +1,8 @@
 /* eslint-disable @next/next/no-img-element */
 'use client';
 
-import { useRouter, useSearchParams } from 'next/navigation';
-import React, { useContext, useEffect, useRef, useState } from 'react';
-import { Checkbox } from 'primereact/checkbox';
+import { useRouter } from 'next/navigation';
+import React, { useContext, useRef, useState } from 'react';
 import { Button } from 'primereact/button';
 import { Password } from 'primereact/password';
 import { Toast } from 'primereact/toast';
@@ -13,40 +12,45 @@ import { classNames } from 'primereact/utils';
 
 const API_BASE_URL = 'http://localhost:8080';
 
-const LoginPage = () => {
+const RegisterPage = () => {
+    const [userName, setUserName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [checked, setChecked] = useState(false);
     const [loading, setLoading] = useState(false);
 
     const toast = useRef<Toast>(null);
 
     const { layoutConfig } = useContext(LayoutContext);
     const router = useRouter();
-    const searchParams = useSearchParams();
 
     const containerClassName = classNames(
         'surface-ground flex align-items-center justify-content-center min-h-screen min-w-screen overflow-hidden',
         { 'p-input-filled': layoutConfig.inputStyle === 'filled' }
     );
 
-    useEffect(() => {
-        const registeredEmail = searchParams.get('email');
-        const registeredPassword = searchParams.get('password');
-
-        if (registeredEmail) {
-            setEmail(registeredEmail);
-        }
-        if (registeredPassword) {
-            setPassword(registeredPassword);
-        }
-    }, [searchParams]);
-
-    const handleLogin = async () => {
+    const handleRegister = async () => {
         setLoading(true);
 
         try {
-            const response = await fetch(`${API_BASE_URL}/user/login`, {
+            const registerResponse = await fetch(`${API_BASE_URL}/user/register`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    userName,
+                    email,
+                    password
+                })
+            });
+
+            const registerResult = await registerResponse.json();
+
+            if (!registerResponse.ok || registerResult.code !== 200) {
+                throw new Error(registerResult.message || '注册失败');
+            }
+
+            const loginResponse = await fetch(`${API_BASE_URL}/user/login`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -57,13 +61,13 @@ const LoginPage = () => {
                 })
             });
 
-            const result = await response.json();
+            const loginResult = await loginResponse.json();
 
-            if (!response.ok || result.code !== 200) {
-                throw new Error(result.message || '登录失败');
+            if (!loginResponse.ok || loginResult.code !== 200) {
+                throw new Error(loginResult.message || '自动登录失败，请手动登录');
             }
 
-            const loginData = result.data;
+            const loginData = loginResult.data;
 
             if (typeof window !== 'undefined') {
                 localStorage.setItem('userId', loginData.userId);
@@ -71,19 +75,12 @@ const LoginPage = () => {
                 localStorage.setItem('email', loginData.email);
             }
 
-            toast.current?.show({
-                severity: 'success',
-                summary: '登录成功',
-                detail: '欢迎回来',
-                life: 2000
-            });
-
-            router.push('/home');
+            router.push('/');
         } catch (error: any) {
             toast.current?.show({
                 severity: 'error',
-                summary: '登录失败',
-                detail: error.message || '登录失败',
+                summary: '操作失败',
+                detail: error.message || '注册失败',
                 life: 3000
             });
         } finally {
@@ -93,7 +90,7 @@ const LoginPage = () => {
 
     return (
         <div className={containerClassName}>
-            <Toast ref={toast} position="top-right" />
+            <Toast ref={toast} position="top-center" />
 
             <div className="flex flex-column align-items-center justify-content-center">
                 <img
@@ -120,15 +117,21 @@ const LoginPage = () => {
                         </div>
 
                         <div>
-                            <label
-                                htmlFor="email1"
-                                className="block text-900 text-xl font-medium mb-2"
-                            >
+                            <label className="block text-900 text-xl font-medium mb-2">
+                                用户名
+                            </label>
+                            <InputText
+                                value={userName}
+                                onChange={(e) => setUserName(e.target.value)}
+                                placeholder="请输入用户名"
+                                className="w-full md:w-30rem mb-5"
+                                style={{ padding: '1rem' }}
+                            />
+
+                            <label className="block text-900 text-xl font-medium mb-2">
                                 邮箱
                             </label>
                             <InputText
-                                id="email1"
-                                type="text"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                                 placeholder="请输入邮箱地址"
@@ -136,14 +139,10 @@ const LoginPage = () => {
                                 style={{ padding: '1rem' }}
                             />
 
-                            <label
-                                htmlFor="password1"
-                                className="block text-900 font-medium text-xl mb-2"
-                            >
+                            <label className="block text-900 font-medium text-xl mb-2">
                                 密码
                             </label>
                             <Password
-                                inputId="password1"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 placeholder="请输入密码"
@@ -153,38 +152,17 @@ const LoginPage = () => {
                                 inputClassName="w-full p-3 md:w-30rem"
                             />
 
-                            <div className="flex align-items-center justify-content-between mb-5 gap-5">
-                                <div className="flex align-items-center">
-                                    <Checkbox
-                                        inputId="rememberme1"
-                                        checked={checked}
-                                        onChange={(e) => setChecked(e.checked ?? false)}
-                                        className="mr-2"
-                                    />
-                                    <label htmlFor="rememberme1">记住我</label>
-                                </div>
-
-                                <Button
-                                    label="忘记密码？"
-                                    text
-                                    className="p-0"
-                                    onClick={() => {
-                                        // router.push('/auth/forgot-password');
-                                    }}
-                                />
-                            </div>
-
                             <div className="flex gap-3">
                                 <Button
-                                    label={loading ? '登录中...' : '登录'}
+                                    label={loading ? '注册中...' : '注册'}
                                     className="flex-1 p-3 text-xl"
-                                    onClick={handleLogin}
+                                    onClick={handleRegister}
                                     disabled={loading}
                                 />
                                 <Button
-                                    label="注册"
+                                    label="返回"
                                     className="flex-1 p-3 text-xl p-button-outlined"
-                                    onClick={() => router.push('/auth/register')}
+                                    onClick={() => router.push('/auth/login')}
                                 />
                             </div>
                         </div>
@@ -195,4 +173,4 @@ const LoginPage = () => {
     );
 };
 
-export default LoginPage;
+export default RegisterPage;
