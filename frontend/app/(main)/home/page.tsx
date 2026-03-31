@@ -24,5 +24,5 @@ export default function Page() {
 
         init();
     }, [router]);
-    return <ModelContainer />;
+    return <ModelContainer streetId="a49f3eea-b0e6-40a1-a537-13ad39561543" />;
 }

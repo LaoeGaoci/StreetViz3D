@@ -1,4 +1,4 @@
-package com.streetviz3d.backend.controller;
+package com.streetviz3d.backend.exception;
 
 import com.streetviz3d.backend.dto.Result;
 import org.springframework.web.bind.MethodArgumentNotValidException;

@@ -1,4 +1,4 @@
-package com.streetviz3d.backend.dto;
+package com.streetviz3d.backend.dto.model;
 
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
