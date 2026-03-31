@@ -336,10 +336,10 @@ export default function ModelContainer({
             style={{
                 width: '100%',
                 height: '100%',
-                minHeight: 520,
+                minHeight: '100vh',
                 position: 'relative',
                 overflow: 'hidden',
-                borderRadius: 18,
+                borderRadius: 0,
                 background: '#000',
                 ...style
             }}
@@ -348,7 +348,7 @@ export default function ModelContainer({
                 style={{
                     position: 'absolute',
                     top: 12,
-                    left: 12,
+                    right: 12,
                     zIndex: 20,
                     background: 'rgba(17,24,39,0.72)',
                     backdropFilter: 'blur(8px)',
@@ -445,13 +445,13 @@ function fallbackStyle(
     return {
         width: '100%',
         height: '100%',
-        minHeight: 320,
+        minHeight: '100vh',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         background,
         color,
-        borderRadius: 16,
+        borderRadius: 0,
         padding: isError ? 24 : undefined,
         textAlign: isError ? 'center' : undefined,
         ...style

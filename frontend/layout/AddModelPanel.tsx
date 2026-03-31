@@ -25,7 +25,7 @@ interface CategoryItem {
 }
 
 const categories: CategoryItem[] = [
-    { label: '🚦Streets & Intersections', type: 'Scene' },
+    { label: '🚦Scene', type: 'Scene' },
     { label: '🌳Plants', type: 'Plant' },
     { label: '🪑Fixtures', type: 'Props' },
     { label: '🚗Vehicles', type: 'Vehicle' },
