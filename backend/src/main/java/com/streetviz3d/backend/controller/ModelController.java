@@ -1,6 +1,6 @@
 package com.streetviz3d.backend.controller;
 
-import com.streetviz3d.backend.dto.ModelPreviewDTO;
+import com.streetviz3d.backend.dto.model.ModelPreviewDTO;
 import com.streetviz3d.backend.service.ModelQueryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;

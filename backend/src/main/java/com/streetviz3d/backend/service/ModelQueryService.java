@@ -2,7 +2,7 @@ package com.streetviz3d.backend.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
-import com.streetviz3d.backend.dto.ModelPreviewDTO;
+import com.streetviz3d.backend.dto.model.ModelPreviewDTO;
 import com.streetviz3d.backend.entity.ModelAsset;
 import com.streetviz3d.backend.mapper.ModelAssetMapper;
 import com.streetviz3d.backend.config.NginxProperties;
