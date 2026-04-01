@@ -13,8 +13,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-
-import java.util.UUID;
+import com.streetviz3d.backend.dto.response.UserStreetListItemResponse;
+import java.util.List;
 
 @RestController
 @RequestMapping("/user")
@@ -83,5 +83,10 @@ public class UserController {
     public Result<Void> updatePassword(@Valid @RequestBody UpdatePasswordRequest request) {
         userService.updatePassword(request);
         return Result.success("密码修改成功", null);
+    }
+
+    @GetMapping("/streetList")
+    public Result<List<UserStreetListItemResponse>> getUserStreetList(@RequestParam String userId) {
+        return Result.success(userService.getUserStreetList(userId));
     }
 }

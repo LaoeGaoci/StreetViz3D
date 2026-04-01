@@ -1,6 +1,7 @@
 .layout-sideTool {
     position: fixed;
-    top: $topbarHeight;
+    top: $topbarHeight + 1rem;
+    left: 1rem;
     z-index: 998;
     display: flex;
     flex-direction: column;
@@ -13,6 +14,7 @@
     width: 100%;
     height: calc(100vh - 15rem);
     z-index: 999;
+    border-radius: 10px;
     overflow-y: auto;
     user-select: none;
 
