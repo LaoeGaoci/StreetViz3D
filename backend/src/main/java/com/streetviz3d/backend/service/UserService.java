@@ -16,6 +16,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.streetviz3d.backend.dto.response.UserStreetListItemResponse;
+import com.streetviz3d.backend.entity.Street;
+import com.streetviz3d.backend.mapper.StreetMapper;
+import java.util.List;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.*;
@@ -29,6 +34,7 @@ import java.util.UUID;
 public class UserService {
 
     private final AppUserMapper appUserMapper;
+    private final StreetMapper streetMapper;
 
     @Value("${app.nginx.base-url}")
     private String nginxBaseUrl;
@@ -397,5 +403,40 @@ public class UserService {
             Path oldFile = avatarDir.resolve(userId + "." + ext);
             Files.deleteIfExists(oldFile);
         }
+    }
+
+    /**
+     * 根据用户 ID 查询该用户保存的街道列表
+     * 业务流程：
+     * 1. 根据 userId 查询用户是否存在；
+     * 2. 若用户不存在则抛出异常；
+     * 3. 根据 creatorId 查询该用户创建的街道；
+     * 4. 按更新时间倒序返回街道列表。
+     *
+     * @param userId 用户唯一标识
+     * @return 用户街道列表
+     * @throws RuntimeException 当用户不存在时抛出异常
+     */
+    public List<UserStreetListItemResponse> getUserStreetList(String userId) {
+        AppUser user = appUserMapper.selectById(userId);
+        if (user == null) {
+            throw new RuntimeException("用户不存在");
+        }
+
+        LambdaQueryWrapper<Street> wrapper = Wrappers.<Street>lambdaQuery()
+                .eq(Street::getCreatorId, userId)
+                .orderByDesc(Street::getUpdatedAt);
+
+        List<Street> streetList = streetMapper.selectList(wrapper);
+
+        return streetList.stream()
+                .map(street -> new UserStreetListItemResponse(
+                        street.getStreetId(),
+                        street.getStreetName(),
+                        street.getWidth(),
+                        street.getCreatedAt(),
+                        street.getUpdatedAt()
+                ))
+                .toList();
     }
 }

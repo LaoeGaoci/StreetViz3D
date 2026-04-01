@@ -25,6 +25,26 @@ export interface UpdatePasswordRequest {
     oldPassword: string;
     newPassword: string;
 }
+export interface UserStreetItem {
+    streetId: string;
+    streetName: string;
+    width: number;
+    createdAt: string;
+    updatedAt: string;
+}
+/**
+ * 用户街道列表项
+ * 对应后端：
+ * GET /api/streets/user/{userId}
+ */
+export interface UserStreetItem {
+    streetId: string;
+    streetName: string;
+    width: number;
+    createdAt: string;
+    updatedAt: string;
+}
+
 
 export async function getUserInfo(userId: string): Promise<UserInfo> {
     const response = await fetch(`${API_BASE_URL}/user/info?userId=${encodeURIComponent(userId)}`, {
@@ -114,4 +134,21 @@ export async function getUserIdFromEmail(): Promise<string> {
     localStorage.setItem('userId', userId);
 
     return userId;
+}
+
+export async function getUserStreetList(userId: string): Promise<UserStreetItem[]> {
+    const response = await fetch(
+        `${API_BASE_URL}/user/streetList?userId=${encodeURIComponent(userId)}`,
+        {
+            method: 'GET'
+        }
+    );
+
+    const result: ApiResponse<UserStreetItem[]> = await response.json();
+
+    if (!response.ok || result.code !== 200) {
+        throw new Error(result.message || '获取用户街道列表失败');
+    }
+
+    return result.data;
 }
