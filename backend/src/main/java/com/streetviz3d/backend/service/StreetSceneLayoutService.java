@@ -23,7 +23,10 @@ public class StreetSceneLayoutService {
 
     public StreetSceneDTO buildStreetScene(String streetId) {
         StreetPreviewResponse preview = streetPreviewService.getStreetPreview(streetId);
+        return buildStreetScene(preview);
+    }
 
+    public StreetSceneDTO buildStreetScene(StreetPreviewResponse preview) {
         StreetSceneDTO scene = new StreetSceneDTO();
         scene.setStreetId(preview.getStreetId());
         scene.setStreetName(preview.getStreetName());
