@@ -8,6 +8,7 @@ import { Password } from 'primereact/password';
 import { Toast } from 'primereact/toast';
 import { Dialog } from 'primereact/dialog';
 import { FileUpload, FileUploadHandlerEvent } from 'primereact/fileupload';
+import { useRouter } from 'next/navigation';
 import AppTopbar from '@/layout/AppTopbar';
 import { AppTopbarRef } from '@/types';
 
@@ -15,54 +16,21 @@ import {
     getUserInfo,
     updatePassword,
     uploadAvatarFile,
-    UserInfo
+    getUserStreetList,
+    UserInfo,
+    UserStreetItem
 } from '../../../api/auth';
-
-interface MockWorkItem {
-    id: string;
-    title: string;
-    cover: string;
-    updatedAt: string;
-    description: string;
-}
-
-const mockWorks: MockWorkItem[] = [
-    {
-        id: '1',
-        title: 'Downtown Street Demo',
-        cover: 'https://placehold.co/600x360?text=StreetViz3D+Work+1',
-        updatedAt: '2026-03-21 12:30',
-        description: '一个包含车道、绿化带和建筑布置的街道场景示例。'
-    },
-    {
-        id: '2',
-        title: 'Bike Lane Street',
-        cover: 'https://placehold.co/600x360?text=StreetViz3D+Work+2',
-        updatedAt: '2026-03-20 19:10',
-        description: '带有自行车道与人行道结构的街道作品。'
-    },
-    {
-        id: '3',
-        title: 'Urban Avenue',
-        cover: 'https://placehold.co/600x360?text=StreetViz3D+Work+3',
-        updatedAt: '2026-03-18 09:45',
-        description: '城市主干道可视化建模的阶段性成果。'
-    },
-    {
-        id: '4',
-        title: 'Intersection Test',
-        cover: 'https://placehold.co/600x360?text=StreetViz3D+Work+4',
-        updatedAt: '2026-03-15 14:20',
-        description: '交叉路口与路侧设施组合测试。'
-    }
-];
 
 export default function ProfilePage() {
     const toast = useRef<Toast>(null);
     const topbarRef = useRef<AppTopbarRef>(null);
+    const router = useRouter();
 
     const [loading, setLoading] = useState(true);
+    const [streetLoading, setStreetLoading] = useState(true);
+
     const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
+    const [streetList, setStreetList] = useState<UserStreetItem[]>([]);
 
     const [passwordDialogVisible, setPasswordDialogVisible] = useState(false);
     const [savingPassword, setSavingPassword] = useState(false);
@@ -72,20 +40,7 @@ export default function ProfilePage() {
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
 
-    const loadUserInfo = async () => {
-        const userId = localStorage.getItem('userId');
-
-        if (!userId) {
-            toast.current?.show({
-                severity: 'warn',
-                summary: '未登录',
-                detail: '请先登录后再查看个人信息',
-                life: 3000
-            });
-            setLoading(false);
-            return;
-        }
-
+    const loadUserInfo = async (userId: string) => {
         try {
             const data = await getUserInfo(userId);
             setUserInfo(data);
@@ -96,13 +51,55 @@ export default function ProfilePage() {
                 detail: error?.message || '获取用户信息失败',
                 life: 3000
             });
+        }
+    };
+
+    const loadUserStreets = async (userId: string) => {
+        try {
+            setStreetLoading(true);
+            const data = await getUserStreetList(userId);
+            setStreetList(data || []);
+        } catch (error: any) {
+            toast.current?.show({
+                severity: 'error',
+                summary: '加载失败',
+                detail: error?.message || '获取用户街道列表失败',
+                life: 3000
+            });
+            setStreetList([]);
+        } finally {
+            setStreetLoading(false);
+        }
+    };
+
+    const loadPageData = async () => {
+        const userId = localStorage.getItem('userId');
+
+        if (!userId) {
+            toast.current?.show({
+                severity: 'warn',
+                summary: '未登录',
+                detail: '请先登录后再查看个人信息',
+                life: 3000
+            });
+            setLoading(false);
+            setStreetLoading(false);
+            return;
+        }
+
+        try {
+            setLoading(true);
+            await Promise.all([
+                loadUserInfo(userId),
+                loadUserStreets(userId)
+            ]);
         } finally {
             setLoading(false);
         }
     };
 
     useEffect(() => {
-        loadUserInfo();
+        loadPageData();
     }, []);
 
     const handleAvatarUpload = async (event: FileUploadHandlerEvent) => {
@@ -132,13 +129,8 @@ export default function ProfilePage() {
         setSavingAvatar(true);
 
         try {
-            // 上传接口已经完成：
-            // 1. 保存文件
-            // 2. 更新数据库 avatar_url
-            // 3. 返回完整头像 URL
             const avatarUrl = await uploadAvatarFile(userId, file);
 
-            // 直接更新本地页面数据，避免必须整页重查一次才能看到新头像
             setUserInfo((prev) => {
                 if (!prev) return prev;
                 return {
@@ -155,8 +147,7 @@ export default function ProfilePage() {
                 life: 2000
             });
 
-            // 如需确保数据和后端完全一致，也可以保留这句重新拉取
-            await loadUserInfo();
+            await loadUserInfo(userId);
         } catch (error: any) {
             toast.current?.show({
                 severity: 'error',
@@ -223,7 +214,7 @@ export default function ProfilePage() {
             setConfirmPassword('');
             setPasswordDialogVisible(false);
 
-            await loadUserInfo();
+            await loadUserInfo(userId);
         } catch (error: any) {
             toast.current?.show({
                 severity: 'error',
@@ -234,6 +225,11 @@ export default function ProfilePage() {
         } finally {
             setSavingPassword(false);
         }
+    };
+
+    // 跳转到街道编辑与显示页面，传递 streetId 参数
+    const handleViewStreet = (streetId: string) => {
+        router.push(`/home?streetId=${encodeURIComponent(streetId)}`);
     };
 
     const passwordDialogFooter = (
@@ -341,7 +337,7 @@ export default function ProfilePage() {
                                 style={{ minHeight: '150px', flex: 1 }}
                             >
                                 <div className="flex-1 flex align-items-center">
-                                    <div className="flex flex-column gap-3">
+                                    <div className="flex flex-column gap-3 mt-4">
                                         <div>
                                             <div className="text-900 font-medium mb-2">用户名</div>
                                             <div className="text-700 text-lg">{userInfo.userName}</div>
@@ -383,46 +379,66 @@ export default function ProfilePage() {
                 </Card>
 
                 <Card title="用户作品">
-                    <div className="grid">
-                        {mockWorks.map((work) => (
-                            <div key={work.id} className="col-12 md:col-6 xl:col-4">
-                                <div
-                                    className="surface-border border-1 border-round overflow-hidden h-full"
-                                    style={{ background: 'var(--surface-card)' }}
-                                >
-                                    <img
-                                        src={work.cover}
-                                        alt={work.title}
-                                        style={{
-                                            width: '100%',
-                                            height: '180px',
-                                            objectFit: 'cover',
-                                            display: 'block'
-                                        }}
-                                    />
-                                    <div className="p-3 flex flex-column gap-2">
-                                        <div className="text-900 text-lg font-medium">
-                                            {work.title}
-                                        </div>
-                                        <div className="text-600 text-sm">
-                                            最近更新：{work.updatedAt}
-                                        </div>
-                                        <div className="text-700 line-height-3">
-                                            {work.description}
-                                        </div>
-                                        <div className="pt-2">
-                                            <Button
-                                                label="查看作品"
-                                                text
-                                                icon="pi pi-arrow-right"
-                                                iconPos="right"
-                                            />
+                    {streetLoading ? (
+                        <div>街道列表加载中...</div>
+                    ) : streetList.length === 0 ? (
+                        <div>当前用户还没有保存任何街道</div>
+                    ) : (
+                        <div className="grid">
+                            {streetList.map((street) => (
+                                <div key={street.streetId} className="col-12 md:col-6 xl:col-4">
+                                    <div
+                                        className="surface-border border-1 border-round overflow-hidden h-full"
+                                        style={{ background: 'var(--surface-card)' }}
+                                    >
+                                        {/* <div
+                                            style={{
+                                                width: '100%',
+                                                height: '180px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                background: 'var(--surface-100)',
+                                                color: 'var(--text-color-secondary)',
+                                                fontSize: '1.1rem',
+                                                fontWeight: 600
+                                            }}
+                                        >
+                                            Street Preview
+                                        </div> */}
+
+                                        <div className="p-3 flex flex-column gap-2">
+                                            <div className="text-900 text-lg font-medium">
+                                                {street.streetName || '未命名街道'}
+                                            </div>
+
+                                            <div className="text-600 text-sm">
+                                                街道ID: {street.streetId}
+                                            </div>
+
+                                            <div className="text-600 text-sm">
+                                                宽度: {street.width ?? '-'}
+                                            </div>
+
+                                            <div className="text-600 text-sm">
+                                                最近更新: {street.updatedAt || '-'}
+                                            </div>
+
+                                            <div className="pt-2">
+                                                <Button
+                                                    label="查看作品"
+                                                    text
+                                                    icon="pi pi-arrow-right"
+                                                    iconPos="right"
+                                                    onClick={() => handleViewStreet(street.streetId)}
+                                                />
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-                        ))}
-                    </div>
+                            ))}
+                        </div>
+                    )}
                 </Card>
             </div>
         </div>
