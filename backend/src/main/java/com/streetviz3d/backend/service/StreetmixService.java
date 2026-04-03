@@ -1,12 +1,16 @@
 package com.streetviz3d.backend.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.streetviz3d.backend.dto.model.ModelAssetDTO;
 import com.streetviz3d.backend.dto.response.StreetPreviewResponse;
 import com.streetviz3d.backend.dto.scene.StreetSceneDTO;
 import com.streetviz3d.backend.dto.street.BoundaryPreviewDTO;
 import com.streetviz3d.backend.dto.street.SegmentPreviewDTO;
+import com.streetviz3d.backend.entity.ModelAsset;
+import com.streetviz3d.backend.mapper.ModelAssetMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -36,6 +40,7 @@ public class StreetmixService {
 
     private final ObjectMapper objectMapper;
     private final StreetSceneLayoutService streetSceneLayoutService;
+    private final ModelAssetMapper modelAssetMapper;
 
     /**
      * 对外主方法：
@@ -43,7 +48,12 @@ public class StreetmixService {
      */
     public StreetSceneDTO buildStreetSceneFromUrl(String streetmixUrl) {
         StreetPreviewResponse preview = buildStreetPreviewFromUrl(streetmixUrl);
-        return streetSceneLayoutService.buildStreetScene(preview);
+        System.out.println("Streetmix preview = " + preview);
+
+        StreetSceneDTO scene = streetSceneLayoutService.buildStreetScene(preview);
+        System.out.println("Streetmix scene = " + scene);
+
+        return scene;
     }
 
     /**
@@ -60,10 +70,10 @@ public class StreetmixService {
 
         StreetPreviewResponse response = new StreetPreviewResponse();
         response.setStreetId("streetmix-" + ref.creatorId + "-" + ref.namespacedId);
-        response.setStreetName(readText(streetNode, "name", "streetName", "title", "slug"));
+        response.setStreetName(readText(root, "name", "streetName", "title", "slug"));
         response.setCreatorId(ref.creatorId);
         response.setNamespacedId(parseInteger(ref.namespacedId));
-        response.setUnit(readInteger(streetNode, "unit"));
+        response.setUnit(readInteger(streetNode, "unit", "units"));
         response.setSchemaVersion(readInteger(streetNode, "schemaVersion"));
         response.setWidth(readDouble(streetNode, "width"));
         response.setSkybox(readText(streetNode, "skybox"));
@@ -87,9 +97,9 @@ public class StreetmixService {
     }
 
     /**
-     * 解析 Streetmix URL
+     * 解析 Streetmix 分享 URL
      * 例如：
-     * https://streetmix.net/erq040609/11/streetmix-3d-example-street
+     * https://streetmix.net/erq040609/12/laoesecondstreet
      */
     private StreetmixRef parseStreetmixUrl(String streetmixUrl) {
         if (streetmixUrl == null || streetmixUrl.isBlank()) {
@@ -105,7 +115,10 @@ public class StreetmixService {
     }
 
     /**
-     * 调用 Streetmix API
+     * 调用 Streetmix 查询接口：
+     * https://streetmix.net/api/v1/streets?namespacedId=...&creatorId=...
+     *
+     * 通过自动重定向跳到真正的 /api/v1/streets/{uuid}
      */
     private JsonNode fetchStreetmixStreet(StreetmixRef ref) {
         String apiUrl = "https://streetmix.net/api/v1/streets?namespacedId="
@@ -116,6 +129,7 @@ public class StreetmixService {
         try {
             HttpClient client = HttpClient.newBuilder()
                     .connectTimeout(Duration.ofSeconds(8))
+                    .followRedirects(HttpClient.Redirect.ALWAYS)
                     .build();
 
             HttpRequest request = HttpRequest.newBuilder()
@@ -131,12 +145,18 @@ public class StreetmixService {
                     HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8)
             );
 
+            System.out.println("Streetmix query URL = " + apiUrl);
+            System.out.println("Streetmix status = " + response.statusCode());
+            System.out.println("Streetmix final URI = " + response.uri());
+            System.out.println("Streetmix body = " + response.body());
+
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
                 throw new RuntimeException("Streetmix API 请求失败，HTTP 状态码：" + response.statusCode());
             }
 
             return objectMapper.readTree(response.body());
         } catch (Exception e) {
+            e.printStackTrace();
             throw new RuntimeException("获取 Streetmix 街道数据失败", e);
         }
     }
@@ -156,6 +176,10 @@ public class StreetmixService {
         if (root.has("data") && root.get("data").isArray()) {
             JsonNode data = root.get("data");
             return data.isEmpty() ? null : data.get(0);
+        }
+
+        if (root.has("data") && root.get("data").has("street")) {
+            return root.get("data").get("street");
         }
 
         if (root.has("street")) {
@@ -183,16 +207,22 @@ public class StreetmixService {
                 continue;
             }
 
+            JsonNode slopeNode = findNode(segmentNode, "slope");
+
             SegmentPreviewDTO dto = new SegmentPreviewDTO();
             dto.setSegmentId("streetmix-segment-" + sortIndex + "-" + UUID.randomUUID().toString().substring(0, 8));
             dto.setSortIndex(sortIndex);
             dto.setType(type);
             dto.setWidth(readDouble(segmentNode, "width"));
             dto.setElevation(readDouble(segmentNode, "elevation"));
-            dto.setSlopeOn(readBoolean(segmentNode, "slopeOn"));
-            dto.setSlopeValues(findNode(segmentNode, "slopeValues"));
+            dto.setSlopeOn(
+                    slopeNode != null ? readBoolean(slopeNode, "on") : readBoolean(segmentNode, "slopeOn")
+            );
+            dto.setSlopeValues(
+                    slopeNode != null ? findNode(slopeNode, "values") : findNode(segmentNode, "slopeValues")
+            );
             dto.setVariantData(buildVariantData(type, segmentNode));
-            dto.setModel(null);
+            dto.setModel(resolveSegmentModel(type, dto.getVariantData()));
 
             result.add(dto);
             sortIndex++;
@@ -202,22 +232,53 @@ public class StreetmixService {
     }
 
     /**
-     * 当前先不从 Streetmix 构建 boundary
-     * 第一版先保证 segment 主链路跑通
+     * 构建 boundary
      */
     private StreetPreviewResponse.BoundaryMap buildBoundaries(JsonNode streetNode) {
         StreetPreviewResponse.BoundaryMap map = new StreetPreviewResponse.BoundaryMap();
-        map.setLeft(null);
-        map.setRight(null);
 
-        // 如果你后面确认了 Streetmix 里的边界字段，再在这里补 left/right
+        JsonNode boundaryNode = findNode(streetNode, "boundary");
+        if (boundaryNode == null || boundaryNode.isNull()) {
+            map.setLeft(null);
+            map.setRight(null);
+            return map;
+        }
+
+        JsonNode leftNode = findNode(boundaryNode, "left");
+        if (leftNode != null && !leftNode.isNull()) {
+            BoundaryPreviewDTO left = new BoundaryPreviewDTO();
+            left.setBoundaryId(readText(leftNode, "id"));
+            left.setSide("left");
+            left.setType(mapBoundaryType(readText(leftNode, "variant")));
+            left.setFloors(readInteger(leftNode, "floors"));
+            left.setElevation(readDouble(leftNode, "elevation"));
+            left.setVariantData(leftNode.isObject() ? leftNode : null);
+            left.setModel(resolveBoundaryModel(left.getType(), left.getVariantData()));
+            map.setLeft(left);
+        } else {
+            map.setLeft(null);
+        }
+
+        JsonNode rightNode = findNode(boundaryNode, "right");
+        if (rightNode != null && !rightNode.isNull()) {
+            BoundaryPreviewDTO right = new BoundaryPreviewDTO();
+            right.setBoundaryId(readText(rightNode, "id"));
+            right.setSide("right");
+            right.setType(mapBoundaryType(readText(rightNode, "variant")));
+            right.setFloors(readInteger(rightNode, "floors"));
+            right.setElevation(readDouble(rightNode, "elevation"));
+            right.setVariantData(rightNode.isObject() ? rightNode : null);
+            right.setModel(resolveBoundaryModel(right.getType(), right.getVariantData()));
+            map.setRight(right);
+        } else {
+            map.setRight(null);
+        }
+
         return map;
     }
 
     /**
-     * 关键点：
-     * 这里不是要完美还原 Streetmix 全部字段，
-     * 而是要尽量补齐 StreetSceneLayoutService 当前真正依赖的 variantData 字段
+     * 尽量补齐 StreetSceneLayoutService 当前真正依赖的 variantData 字段
      */
     private JsonNode buildVariantData(String type, JsonNode segmentNode) {
         ObjectNode node = objectMapper.createObjectNode();
@@ -260,7 +321,13 @@ public class StreetmixService {
         } else if ("temporary".equals(lowerType)) {
             fillIfMissing(node, "barrierType", "traffic-cone");
         } else if ("sidewalk-tree".equals(lowerType)) {
-            fillIfMissing(node, "treeType", "tree");
+            if (lowerVariant.contains("palm")) {
+                fillIfMissing(node, "treeType", "palm-tree");
+            } else if (lowerVariant.contains("big")) {
+                fillIfMissing(node, "treeType", "big");
+            } else {
+                fillIfMissing(node, "treeType", "big");
+            }
         } else if ("sidewalk".equals(lowerType)) {
             if (lowerVariant.contains("dense")) {
                 fillIfMissing(node, "pedestrianDensity", "dense");
@@ -274,6 +341,257 @@ public class StreetmixService {
         }
 
         return node;
+    }
+
+    /**
+     * Segment -> model_asset 映射
+     */
+    private ModelAssetDTO resolveSegmentModel(String type, JsonNode variantData) {
+        if (type == null || type.isBlank()) {
+            return null;
+        }
+
+        String normalizedType = type.toLowerCase(Locale.ROOT);
+        ModelAsset model = null;
+
+        switch (normalizedType) {
+            case "drive-lane" -> {
+                String vehicleType = readText(variantData, "vehicleType");
+                model = findFirstModel("Vehicle", vehicleType);
+                if (model == null) {
+                    model = findFirstModelByType("Vehicle");
+                }
+            }
+            case "bus-lane" -> {
+                model = findFirstModel("Vehicle", "bus");
+                if (model == null) {
+                    model = findFirstModelByType("Vehicle");
+                }
+            }
+            case "parking-lane" -> {
+                model = findFirstModel("Vehicle", "car");
+                if (model == null) {
+                    model = findFirstModelByType("Vehicle");
+                }
+            }
+            case "flex-zone" -> {
+                model = findFirstModel("Vehicle", "taxi");
+                if (model == null) {
+                    model = findFirstModelByType("Vehicle");
+                }
+            }
+            case "temporary" -> {
+                String barrierType = readText(variantData, "barrierType");
+                model = findFirstModel("Props", barrierType);
+                if (model == null) {
+                    model = findFirstModelByType("Props");
+                }
+            }
+            case "sidewalk-tree" -> {
+                String treeType = readText(variantData, "treeType");
+                model = findFirstModel("Plant", treeType);
+                if (model == null) {
+                    model = findFirstModelByType("Plant");
+                }
+            }
+            case "sidewalk" -> {
+                return null;
+            }
+            default -> {
+                return null;
+            }
+        }
+
+        return toModelDTO(model);
+    }
+
+    /**
+     * Boundary -> model_asset 映射
+     */
+    private ModelAssetDTO resolveBoundaryModel(String boundaryType, JsonNode variantData) {
+        if (boundaryType == null || boundaryType.isBlank()) {
+            return null;
+        }
+
+        String normalizedType = boundaryType.trim().toLowerCase(Locale.ROOT);
+        ModelAsset model = null;
+
+        switch (normalizedType) {
+            case "parking-lot" -> {
+                model = findFirstModel("Scene", "parking-lot");
+                if (model == null) {
+                    model = findFirstModelByType("Scene");
+                }
+            }
+
+            case "waterfront" -> {
+                model = findFirstModel("Scene", "waterfront");
+                if (model == null) {
+                    model = findFirstModelByType("Scene");
+                }
+            }
+
+            case "residential" -> {
+                model = findFirstModel("Building", "residential");
+                if (model == null) {
+                    model = findFirstModel("Building", "wide");
+                }
+                if (model == null) {
+                    model = findFirstModel("Building", "narrow");
+                }
+                if (model == null) {
+                    model = findFirstModelByType("Building");
+                }
+            }
+
+            case "narrow" -> {
+                model = findFirstModel("Building", "narrow");
+                if (model == null) {
+                    model = findFirstModel("Building", "residential");
+                }
+                if (model == null) {
+                    model = findFirstModelByType("Building");
+                }
+            }
+
+            case "wide" -> {
+                model = findFirstModel("Building", "wide");
+                if (model == null) {
+                    model = findFirstModel("Building", "residential");
+                }
+                if (model == null) {
+                    model = findFirstModelByType("Building");
+                }
+            }
+
+            case "arcade" -> {
+                model = findFirstModel("Building", "arcade");
+                if (model == null) {
+                    model = findFirstModel("Building", "residential");
+                }
+                if (model == null) {
+                    model = findFirstModelByType("Building");
+                }
+            }
+
+            case "fence" -> {
+                model = findFirstModel("Props", "fence");
+                if (model == null) {
+                    model = findFirstModel("Scene", "fence");
+                }
+                if (model == null) {
+                    model = findFirstModelByType("Props");
+                }
+            }
+
+            case "compound-wall" -> {
+                model = findFirstModel("Props", "compound-wall");
+                if (model == null) {
+                    model = findFirstModel("Props", "wall");
+                }
+                if (model == null) {
+                    model = findFirstModel("Scene", "compound-wall");
+                }
+                if (model == null) {
+                    model = findFirstModelByType("Props");
+                }
+            }
+
+            case "grass" -> {
+                model = findFirstModel("Scene", "grass");
+                if (model == null) {
+                    model = findFirstModel("Plant", "grass");
+                }
+                if (model == null) {
+                    model = findFirstModelByType("Scene");
+                }
+            }
+
+            default -> {
+                String rawVariant = readText(variantData, "variant");
+                if (rawVariant != null && !rawVariant.isBlank()) {
+                    model = findFirstModel("Building", rawVariant);
+                    if (model == null) {
+                        model = findFirstModel("Props", rawVariant);
+                    }
+                    if (model == null) {
+                        model = findFirstModel("Scene", rawVariant);
+                    }
+                }
+            }
+        }
+
+        return toModelDTO(model);
+    }
+
+    private ModelAsset findFirstModel(String modelType, String modelSubtype) {
+        LambdaQueryWrapper<ModelAsset> wrapper = new LambdaQueryWrapper<ModelAsset>()
+                .eq(ModelAsset::getModelType, modelType);
+
+        if (modelSubtype != null && !modelSubtype.isBlank()) {
+            wrapper.eq(ModelAsset::getModelSubtype, modelSubtype);
+        }
+
+        wrapper.last("limit 1");
+        List<ModelAsset> list = modelAssetMapper.selectList(wrapper);
+        return list.isEmpty() ? null : list.get(0);
+    }
+
+    private ModelAsset findFirstModelByType(String modelType) {
+        LambdaQueryWrapper<ModelAsset> wrapper = new LambdaQueryWrapper<ModelAsset>()
+                .eq(ModelAsset::getModelType, modelType)
+                .last("limit 1");
+
+        List<ModelAsset> list = modelAssetMapper.selectList(wrapper);
+        return list.isEmpty() ? null : list.get(0);
+    }
+
+    private ModelAssetDTO toModelDTO(ModelAsset modelAsset) {
+        if (modelAsset == null) {
+            return null;
+        }
+
+        ModelAssetDTO dto = new ModelAssetDTO();
+        dto.setModelId(modelAsset.getModelId());
+        dto.setModelName(modelAsset.getModelName());
+        dto.setModelType(modelAsset.getModelType());
+        dto.setModelSubtype(modelAsset.getModelSubtype());
+        dto.setDisplayName(modelAsset.getDisplayName());
+        dto.setModelUrl(modelAsset.getModelUrl());
+        dto.setPreviewUrl(modelAsset.getModelPreviewUrl());
+        return dto;
+    }
+
+    private String mapBoundaryType(String variant) {
+        if (variant == null || variant.isBlank()) {
+            return "residential";
+        }
+
+        String lower = variant.trim().toLowerCase(Locale.ROOT);
+
+        return switch (lower) {
+            case "residential" -> "residential";
+            case "narrow" -> "narrow";
+            case "wide" -> "wide";
+            case "arcade" -> "arcade";
+            case "fence" -> "fence";
+            case "grass" -> "grass";
+            case "compound-wall" -> "compound-wall";
+            case "parking-lot" -> "parking-lot";
+            case "waterfront" -> "waterfront";
+            default -> {
+                if (lower.contains("parking")) {
+                    yield "parking-lot";
+                }
+                if (lower.contains("water")) {
+                    yield "waterfront";
+                }
+                if (lower.contains("compound") && lower.contains("wall")) {
+                    yield "compound-wall";
+                }
+                yield lower;
+            }
+        };
     }
 
     private void fillIfMissing(ObjectNode node, String key, String fallbackValue) {

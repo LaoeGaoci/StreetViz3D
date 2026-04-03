@@ -1,6 +1,6 @@
-/* eslint-disable @next/next/no-img-element */
 'use client';
 
+/* eslint-disable @next/next/no-img-element */
 import React, { useEffect, useRef, useState } from 'react';
 import { Card } from 'primereact/card';
 import { Button } from 'primereact/button';
@@ -227,7 +227,6 @@ export default function ProfilePage() {
         }
     };
 
-    // 跳转到街道编辑与显示页面，传递 streetId 参数
     const handleViewStreet = (streetId: string) => {
         router.push(`/home?streetId=${encodeURIComponent(streetId)}`);
     };
@@ -391,22 +390,6 @@ export default function ProfilePage() {
                                         className="surface-border border-1 border-round overflow-hidden h-full"
                                         style={{ background: 'var(--surface-card)' }}
                                     >
-                                        {/* <div
-                                            style={{
-                                                width: '100%',
-                                                height: '180px',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                background: 'var(--surface-100)',
-                                                color: 'var(--text-color-secondary)',
-                                                fontSize: '1.1rem',
-                                                fontWeight: 600
-                                            }}
-                                        >
-                                            Street Preview
-                                        </div> */}
-
                                         <div className="p-3 flex flex-column gap-2">
                                             <div className="text-900 text-lg font-medium">
                                                 {street.streetName || '未命名街道'}

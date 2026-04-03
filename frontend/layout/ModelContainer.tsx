@@ -2,7 +2,6 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-    fetchStreetScene,
     resolveModelUrl,
     SceneInstanceDTO,
     StreetSceneDTO
@@ -71,7 +70,7 @@ if (
 }
 
 interface ModelContainerProps {
-    streetId: string;
+    sceneData: StreetSceneDTO;
     className?: string;
     style?: React.CSSProperties;
 }
@@ -136,7 +135,6 @@ function GltfEntity({
         el.addEventListener('model-error', onError);
         el.addEventListener('model-loaded', onModelLoaded);
 
-        // 防止事件先于监听器触发，主动补一遍
         applyShadowToMesh();
 
         return () => {
@@ -158,7 +156,7 @@ function GltfEntity({
 }
 
 function PlaceholderEntity({ instance }: { instance: SceneInstanceDTO }) {
-    const width = instance.width ?? 100;
+    const width = instance.width ?? 1;
     const height = instance.height ?? 1;
     const depth = instance.depth ?? 1;
     const color = instance.color || '#9ca3af';
@@ -202,27 +200,22 @@ function SceneInstanceRenderer({
 }
 
 export default function ModelContainer({
-    streetId,
+    sceneData,
     className,
     style
 }: ModelContainerProps) {
     const [aframeReady, setAframeReady] = useState(false);
-    const [scene, setScene] = useState<StreetSceneDTO | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         let mounted = true;
 
         async function loadAFrame() {
             try {
-                if (mounted) setAframeReady(true);
-            } catch (e) {
-                console.error('A-Frame 加载失败', e);
                 if (mounted) {
-                    setError('A-Frame 依赖未安装');
-                    setLoading(false);
+                    setAframeReady(true);
                 }
+            } catch (e) {
+                console.error('A-Frame 初始化失败', e);
             }
         }
 
@@ -233,43 +226,8 @@ export default function ModelContainer({
         };
     }, []);
 
-    useEffect(() => {
-        if (!aframeReady) return;
-
-        let cancelled = false;
-
-        async function loadScene() {
-            try {
-                setLoading(true);
-                setError(null);
-
-                const result = await fetchStreetScene(streetId);
-
-                if (!cancelled) {
-                    setScene(result);
-                }
-            } catch (e: any) {
-                console.error('加载街道场景失败：', e);
-                if (!cancelled) {
-                    setError(e?.message || '加载街道场景失败');
-                }
-            } finally {
-                if (!cancelled) {
-                    setLoading(false);
-                }
-            }
-        }
-
-        loadScene();
-
-        return () => {
-            cancelled = true;
-        };
-    }, [aframeReady, streetId]);
-
     const allBoundaryInstances = useMemo(() => {
-        if (!scene) return [];
-        console.log(scene);
+        const scene = sceneData;
         const result: Array<{ key: string; instance: SceneInstanceDTO }> = [];
 
         if (scene.leftBoundary?.supportSurface) {
@@ -301,9 +259,9 @@ export default function ModelContainer({
         });
 
         return result;
-    }, [scene]);
+    }, [sceneData]);
 
-    if (!aframeReady && !error) {
+    if (!aframeReady) {
         return (
             <div className={className} style={fallbackStyle('#111827', '#e5e7eb', style)}>
                 正在初始化 3D 引擎...
@@ -311,22 +269,15 @@ export default function ModelContainer({
         );
     }
 
-    if (loading) {
-        return (
-            <div className={className} style={fallbackStyle('#111827', '#e5e7eb', style)}>
-                正在加载街道场景...
-            </div>
-        );
-    }
-
-    if (error || !scene) {
+    if (!sceneData) {
         return (
             <div className={className} style={fallbackStyle('#111827', '#f87171', style, true)}>
-                {error || '未获取到街道场景数据'}
+                未获取到场景数据
             </div>
         );
     }
 
+    const scene = sceneData;
     const styleInfo = scene.style;
     const base = scene.base;
 
@@ -382,7 +333,12 @@ export default function ModelContainer({
                 <a-sky color={styleInfo?.skyColor || '#e4ecf6'} />
 
                 <a-entity position="0 14 22" fly-controls-y="speed: 8">
-                    <a-camera wasd-controls-enabled="true" look-controls-enabled="true" near="0.1" far="2000" />
+                    <a-camera
+                        wasd-controls-enabled="true"
+                        look-controls-enabled="true"
+                        near="0.1"
+                        far="2000"
+                    />
                 </a-entity>
 
                 <StreetSceneLights styleInfo={styleInfo} />
