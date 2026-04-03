@@ -192,6 +192,22 @@ export async function fetchStreetScene(streetId: string): Promise<StreetSceneDTO
     return result.scene;
 }
 
+export async function fetchStreetSceneFromStreetmix(streetmixUrl: string): Promise<StreetSceneDTO> {
+    const response = await fetch(`${API_BASE_URL}/api/streetmix/scene`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ streetmixUrl })
+    });
+
+    if (!response.ok) {
+        throw new Error(`请求失败: ${response.status}`);
+    }
+    //console.log(await response.json());
+    return await response.json();
+}
+
 export function resolveModelUrl(modelUrl?: string | null): string | null {
     if (!modelUrl) return null;
 
