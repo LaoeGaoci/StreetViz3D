@@ -103,12 +103,14 @@ npm run dev
 
 前后端分离架构，由四部分组成：
 
-组件    技术
-前端    Next.js 13 (App Router) + PrimeReact + A-Frame + TypeScript
-后端    Spring Boot + MyBatis-Plus + Maven + Java 21
-数据库    PostgreSQL 15+
-静态资源    Nginx (GLTF 模型、头像)
-请求流程：前端调用 Spring Boot API → 后端返回 Result<T> 统一格式 → 前端通过 Nginx 加载模型/头像资源。后端已配置 CORS 允许 http://localhost:3000 进行本地联调。
+| 组件 | 技术 |
+|---|---|
+| 前端 | Next.js 13 (App Router) + PrimeReact + A-Frame + TypeScript |
+| 后端 | Spring Boot + MyBatis-Plus + Maven + Java 21 |
+| 数据库 | PostgreSQL 15+ |
+| 静态资源 | Nginx (GLTF 模型、头像) |
+
+请求流程：前端调用 Spring Boot API → 后端返回 `Result<T>` 统一格式 → 前端通过 Nginx 加载模型/头像资源。后端已配置 CORS，允许 `http://localhost:3000` 进行本地联调。
 
 #### 📁 项目结构
 
