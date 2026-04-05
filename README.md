@@ -194,16 +194,16 @@ StreetViz3D/
 
 所有 3D 模型位于 assets/models/，按类别存放：
 
-Urban：建筑、车辆、道路设施
+- Urban：建筑、车辆、道路设施
 
-Nature：树木、花卉、自然边界
+- Nature：树木、花卉、自然边界
 
 每个模型通常包含：
 
-Preview_[ModelName].png（预览图）
+- Preview_[ModelName].png（预览图）
 
-[ModelName].blend（源文件）
+- [ModelName].blend（源文件）
 
-gltf_model/[ModelName].gltf + .bin + 贴图
+- gltf_model/[ModelName].gltf + .bin + 贴图
 
-运行时系统通过 resolveModelUrl() 将相对路径转为绝对 URL，从 Nginx 加载。.blend 等备份文件不参与前端加载。
+运行时系统通过 resolveModelUrl() 将相对路径转为绝对 URL，从 Nginx 加载。`.blend` 等备份文件不参与前端加载。
