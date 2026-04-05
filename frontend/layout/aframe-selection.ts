@@ -4,7 +4,7 @@ import * as THREE from 'three';
 
 export interface SelectableMeta {
     selectionId: string;
-    kind: 'segment-surface' | 'segment-instance' | 'boundary-instance';
+    kind: 'segment-surface' | 'segment-instance' | 'boundary-instance' | 'scene-instance';
     semanticType?: string;
     displayName?: string | null;
     modelId?: string | null;
@@ -125,6 +125,12 @@ export function createSelectionController({
         helper.visible = true;
     }
 
+    function applySelection(el: any | null) {
+        selectedEl = el;
+        updateHelper(selectedBox, el);
+        onSelect?.(payloadFromElement(el));
+    }
+
     function getIntersectedSelectable(): any | null {
         const cursorComp = mouseCursor.components?.cursor;
         const intersectedEl = cursorComp?.intersectedEl;
@@ -151,9 +157,7 @@ export function createSelectionController({
         if (downPos.distanceTo(upPos) !== 0) return;
 
         const el = getIntersectedSelectable();
-        selectedEl = el;
-        updateHelper(selectedBox, el);
-        onSelect?.(payloadFromElement(el));
+        applySelection(el);
     }
 
     function onMouseEnter() {
@@ -185,6 +189,58 @@ export function createSelectionController({
         onHover?.(null);
     }
 
+    function findElementBySelectionId(selectionId: string): any | null {
+        const selectableNodes = sceneEl.querySelectorAll('[data-selectable="true"]');
+
+        for (const node of selectableNodes) {
+            const meta = parseMeta(node);
+            if (meta?.selectionId === selectionId) {
+                return node;
+            }
+        }
+
+        return null;
+    }
+
+    function selectBySelectionId(selectionId: string): SelectionPayload | null {
+        const el = findElementBySelectionId(selectionId);
+        if (!el) {
+            return null;
+        }
+
+        applySelection(el);
+        return payloadFromElement(el);
+    }
+
+    function focusSelected(options?: { distanceMultiplier?: number }) {
+        if (!selectedEl?.object3D) {
+            return;
+        }
+
+        const cameraEl = sceneEl.camera?.el;
+        if (!cameraEl) {
+            return;
+        }
+
+        const payload = payloadFromElement(selectedEl);
+        if (!payload) {
+            return;
+        }
+
+        const center = payload.center.clone();
+        const size = payload.size.clone();
+        const maxSize = Math.max(size.x, size.y, size.z, 1);
+        const distanceMultiplier = options?.distanceMultiplier ?? 2.4;
+
+        cameraEl.setAttribute('position', {
+            x: center.x + maxSize * distanceMultiplier,
+            y: center.y + maxSize * 0.8,
+            z: center.z + maxSize * distanceMultiplier
+        });
+
+        cameraEl.object3D.lookAt(center);
+    }
+
     mouseCursor.addEventListener('click', onClick);
     mouseCursor.addEventListener('mouseenter', onMouseEnter);
     mouseCursor.addEventListener('mouseleave', onMouseLeave);
@@ -207,6 +263,8 @@ export function createSelectionController({
     return {
         clearSelection,
         refreshSelected,
+        selectBySelectionId,
+        focusSelected,
         destroy() {
             mouseCursor.removeEventListener('click', onClick);
             mouseCursor.removeEventListener('mouseenter', onMouseEnter);

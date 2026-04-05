@@ -11,6 +11,8 @@ import SelectionInfoPanel from './SelectionInfoPanel';
 import { createSelectionController, SelectionPayload, SelectableMeta } from './aframe-selection';
 import 'aframe';
 
+const SELECT_NODE_EVENT = 'streetviz3d:select-node';
+
 if (
     typeof window !== 'undefined' &&
     (window as any).AFRAME &&
@@ -275,7 +277,7 @@ export default function ModelContainer({
 
             controllerRef.current = createSelectionController({
                 sceneEl,
-                onSelect: (payload) => {
+                onSelect: (payload: SelectionPayload | null) => {
                     setSelected(payload);
                     setVisibleRight(!!payload);
                 },
@@ -297,6 +299,37 @@ export default function ModelContainer({
             }
         };
     }, [aframeReady, sceneData]);
+
+    useEffect(() => {
+        const handleExternalSelect = (event: Event) => {
+            const customEvent = event as CustomEvent<{ selectionId?: string }>;
+            const selectionId = customEvent.detail?.selectionId;
+
+            if (!selectionId || !controllerRef.current) {
+                return;
+            }
+
+            const payload = controllerRef.current.selectBySelectionId?.(selectionId);
+
+            if (!payload) {
+                console.warn('未找到对应的场景节点：', selectionId);
+                return;
+            }
+
+            setSelected(payload);
+            setVisibleRight(true);
+
+            window.requestAnimationFrame(() => {
+                controllerRef.current?.focusSelected?.();
+            });
+        };
+
+        window.addEventListener(SELECT_NODE_EVENT, handleExternalSelect);
+
+        return () => {
+            window.removeEventListener(SELECT_NODE_EVENT, handleExternalSelect);
+        };
+    }, []);
 
     const allBoundaryInstances = useMemo(() => {
         const scene = sceneData;

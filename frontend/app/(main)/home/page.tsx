@@ -6,6 +6,23 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { getUserIdFromEmail } from '../../api/auth';
 import { fetchStreetScene, fetchStreetSceneFromStreetmix, StreetSceneDTO } from '../../api/street';
 
+const SCENE_STORAGE_KEY = 'streetviz3d-current-scene';
+const SCENE_UPDATED_EVENT = 'streetviz3d:scene-updated';
+
+function syncSceneTree(scene: StreetSceneDTO | null) {
+    if (typeof window === 'undefined') {
+        return;
+    }
+
+    if (!scene) {
+        window.sessionStorage.removeItem(SCENE_STORAGE_KEY);
+    } else {
+        window.sessionStorage.setItem(SCENE_STORAGE_KEY, JSON.stringify(scene));
+    }
+
+    window.dispatchEvent(new CustomEvent(SCENE_UPDATED_EVENT));
+}
+
 export default function Page() {
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -27,6 +44,7 @@ export default function Page() {
 
                 const defaultScene = await fetchStreetScene(defaultStreetId);
                 setSceneData(defaultScene);
+                syncSceneTree(defaultScene);
             } catch (e: any) {
                 router.replace('/auth/login');
                 return;
@@ -36,6 +54,10 @@ export default function Page() {
         };
 
         init();
+
+        return () => {
+            syncSceneTree(null);
+        };
     }, [router, defaultStreetId]);
 
     const handlePreviewStreetmix = async () => {
@@ -49,8 +71,8 @@ export default function Page() {
             setError(null);
 
             const scene = await fetchStreetSceneFromStreetmix(streetmixUrl.trim());
-            //console.log('从 Streetmix 获取的场景数据:', scene);
             setSceneData(scene);
+            syncSceneTree(scene);
         } catch (e: any) {
             setError(e?.message || 'Streetmix 预览失败');
         } finally {
@@ -65,6 +87,7 @@ export default function Page() {
 
             const defaultScene = await fetchStreetScene(defaultStreetId);
             setSceneData(defaultScene);
+            syncSceneTree(defaultScene);
             setStreetmixUrl('');
         } catch (e: any) {
             setError(e?.message || '默认街道加载失败');
@@ -73,7 +96,7 @@ export default function Page() {
         }
     };
 
-    if (!ready || loading && !sceneData) {
+    if (!ready || (loading && !sceneData)) {
         return <div style={{ padding: '24px' }}>加载中...</div>;
     }
 

@@ -1,42 +1,68 @@
 /* eslint-disable @next/next/no-img-element */
+'use client';
 
-import React, { useContext } from 'react';
+import React, { useEffect, useState } from 'react';
 import AppMenuitem from './AppMenuitem';
-import { LayoutContext } from './context/layoutcontext';
 import { MenuProvider } from './context/menucontext';
 import { AppMenuItem } from '@/types';
 import AppFooter from './AppFooter';
+import { StreetSceneDTO } from '@/app/api/street';
+import { buildSceneTree } from './buildSceneTree';
 
-import { Tree } from '@icon-park/react'
+const SCENE_STORAGE_KEY = 'streetviz3d-current-scene';
+const SCENE_UPDATED_EVENT = 'streetviz3d:scene-updated';
+
+function readSceneFromStorage(): StreetSceneDTO | null {
+    if (typeof window === 'undefined') {
+        return null;
+    }
+
+    const raw = window.sessionStorage.getItem(SCENE_STORAGE_KEY);
+    if (!raw) {
+        return null;
+    }
+
+    try {
+        return JSON.parse(raw) as StreetSceneDTO;
+    } catch (error) {
+        console.error('读取场景树缓存失败：', error);
+        return null;
+    }
+}
+
 const AppMenu = () => {
-    const { layoutConfig } = useContext(LayoutContext);
+    const [sceneData, setSceneData] = useState<StreetSceneDTO | null>(null);
 
-    const model: AppMenuItem[] = [
-        {
-            label: 'Scene',
-            items: [
-                {
-                    label: 'Model Tree',
-                    icon: 'pi pi-fw pi-sitemap',
-                    items: [
-                        { label: 'Vehicles', icon: 'pi pi-fw pi-car' },
-                        { label: 'Buildings', icon: 'pi pi-fw pi-home' },
-                        { label: 'Plants', icon: 'pi pi-image' },
-                        { label: 'People', icon: 'pi pi-fw pi-user' },
-                        { label: 'Signs', icon: 'pi pi-fw pi-flag' },
-                        { label: 'Props', icon: 'pi pi-fw pi-bolt' }
-                    ]
-                }
-            ]
-        }
-    ];
+    useEffect(() => {
+        const syncScene = () => {
+            setSceneData(readSceneFromStorage());
+        };
+
+        syncScene();
+        window.addEventListener(SCENE_UPDATED_EVENT, syncScene);
+
+        return () => {
+            window.removeEventListener(SCENE_UPDATED_EVENT, syncScene);
+        };
+    }, []);
+
+    const model: AppMenuItem[] = buildSceneTree(sceneData);
 
     return (
         <MenuProvider>
             <ul className="layout-menu">
-                {model.map((item, i) => {
-                    return !item?.seperator ? <AppMenuitem item={item} root={true} index={i} key={item.label} /> : <li className="menu-separator"></li>;
-                })}
+                {model.map((item, i) =>
+                    !item?.seperator ? (
+                        <AppMenuitem
+                            item={item}
+                            root={true}
+                            index={i}
+                            key={`${item.label}-${i}`}
+                        />
+                    ) : (
+                        <li className="menu-separator" key={`separator-${i}`}></li>
+                    )
+                )}
             </ul>
             <AppFooter />
         </MenuProvider>
