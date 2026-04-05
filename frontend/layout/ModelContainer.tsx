@@ -7,6 +7,8 @@ import {
     StreetSceneDTO
 } from '@/app/api/street';
 import StreetSceneLights from './StreetSceneLights';
+import SelectionInfoPanel from './SelectionInfoPanel';
+import { createSelectionController, SelectionPayload, SelectableMeta } from './aframe-selection';
 import 'aframe';
 
 if (
@@ -80,6 +82,8 @@ interface GltfEntityProps {
     position: string;
     rotation?: string;
     scale?: string;
+    meta: SelectableMeta;
+    onModelReady?: () => void;
 }
 
 function vectorToString(
@@ -90,11 +94,17 @@ function vectorToString(
     return `${vector.x} ${vector.y} ${vector.z}`;
 }
 
-function GltfEntity({
+function serializeMeta(meta: SelectableMeta): string {
+    return JSON.stringify(meta);
+}
+
+function SelectableGltfEntity({
     url,
     position,
     rotation = '0 0 0',
-    scale = '1 1 1'
+    scale = '1 1 1',
+    meta,
+    onModelReady
 }: GltfEntityProps) {
     const entityRef = useRef<any>(null);
 
@@ -130,6 +140,7 @@ function GltfEntity({
 
         const onModelLoaded = () => {
             applyShadowToMesh();
+            onModelReady?.();
         };
 
         el.addEventListener('model-error', onError);
@@ -141,7 +152,7 @@ function GltfEntity({
             el.removeEventListener('model-error', onError);
             el.removeEventListener('model-loaded', onModelLoaded);
         };
-    }, [url]);
+    }, [url, onModelReady]);
 
     return (
         <a-entity
@@ -151,11 +162,19 @@ function GltfEntity({
             rotation={rotation}
             scale={scale}
             shadow="cast: true; receive: true"
+            data-selectable="true"
+            data-selection-meta={serializeMeta(meta)}
         />
     );
 }
 
-function PlaceholderEntity({ instance }: { instance: SceneInstanceDTO }) {
+function SelectablePlaceholderEntity({
+    instance,
+    meta
+}: {
+    instance: SceneInstanceDTO;
+    meta: SelectableMeta;
+}) {
     const width = instance.width ?? 1;
     const height = instance.height ?? 1;
     const depth = instance.depth ?? 1;
@@ -172,31 +191,46 @@ function PlaceholderEntity({ instance }: { instance: SceneInstanceDTO }) {
             color={color}
             opacity="0.95"
             shadow="cast: true; receive: true"
+            data-selectable="true"
+            data-selection-meta={serializeMeta(meta)}
         />
     );
 }
 
 function SceneInstanceRenderer({
     instance,
-    instanceKey
+    instanceKey,
+    meta,
+    onModelReady
 }: {
     instance: SceneInstanceDTO;
     instanceKey: string;
+    meta: SelectableMeta;
+    onModelReady?: () => void;
 }) {
     const modelUrl = resolveModelUrl(instance.modelUrl);
+
     if (modelUrl) {
         return (
-            <GltfEntity
+            <SelectableGltfEntity
                 key={instanceKey}
                 url={modelUrl}
                 position={vectorToString(instance.position)}
                 rotation={vectorToString(instance.rotation)}
                 scale={vectorToString(instance.scale, '1 1 1')}
+                meta={meta}
+                onModelReady={onModelReady}
             />
         );
     }
 
-    return <PlaceholderEntity key={instanceKey} instance={instance} />;
+    return (
+        <SelectablePlaceholderEntity
+            key={instanceKey}
+            instance={instance}
+            meta={meta}
+        />
+    );
 }
 
 export default function ModelContainer({
@@ -205,6 +239,10 @@ export default function ModelContainer({
     style
 }: ModelContainerProps) {
     const [aframeReady, setAframeReady] = useState(false);
+    const [selected, setSelected] = useState<SelectionPayload | null>(null);
+    const [visibleRight, setVisibleRight] = useState(false);
+    const sceneRef = useRef<any>(null);
+    const controllerRef = useRef<any>(null);
 
     useEffect(() => {
         let mounted = true;
@@ -226,40 +264,122 @@ export default function ModelContainer({
         };
     }, []);
 
+    useEffect(() => {
+        const sceneEl = sceneRef.current;
+        if (!sceneEl || !aframeReady) return;
+
+        let destroyed = false;
+
+        const mountController = () => {
+            if (destroyed || controllerRef.current) return;
+
+            controllerRef.current = createSelectionController({
+                sceneEl,
+                onSelect: (payload) => {
+                    setSelected(payload);
+                    setVisibleRight(!!payload);
+                },
+                onHover: () => { }
+            });
+        };
+
+        if (sceneEl.hasLoaded) {
+            mountController();
+        } else {
+            sceneEl.addEventListener('loaded', mountController, { once: true });
+        }
+
+        return () => {
+            destroyed = true;
+            if (controllerRef.current) {
+                controllerRef.current.destroy();
+                controllerRef.current = null;
+            }
+        };
+    }, [aframeReady, sceneData]);
+
     const allBoundaryInstances = useMemo(() => {
         const scene = sceneData;
-        const result: Array<{ key: string; instance: SceneInstanceDTO }> = [];
+        const result: Array<{ key: string; instance: SceneInstanceDTO; meta: SelectableMeta }> = [];
 
         if (scene.leftBoundary?.supportSurface) {
             result.push({
                 key: `left-support-${scene.leftBoundary.boundaryId}`,
-                instance: scene.leftBoundary.supportSurface
+                instance: scene.leftBoundary.supportSurface,
+                meta: {
+                    selectionId: `left-support-${scene.leftBoundary.boundaryId}`,
+                    kind: 'boundary-instance',
+                    semanticType: scene.leftBoundary.type,
+                    displayName: `${scene.leftBoundary.type}-support`,
+                    modelId: scene.leftBoundary.supportSurface.modelId ?? null,
+                    modelUrl: scene.leftBoundary.supportSurface.modelUrl ?? null,
+                    width: scene.leftBoundary.supportSurface.width ?? null,
+                    height: scene.leftBoundary.supportSurface.height ?? null,
+                    depth: scene.leftBoundary.supportSurface.depth ?? null
+                }
             });
         }
 
         scene.leftBoundary?.instances?.forEach((instance, index) => {
             result.push({
                 key: `left-instance-${scene.leftBoundary?.boundaryId}-${index}`,
-                instance
+                instance,
+                meta: {
+                    selectionId: `left-instance-${scene.leftBoundary?.boundaryId}-${index}`,
+                    kind: 'boundary-instance',
+                    semanticType: scene.leftBoundary?.type,
+                    displayName: instance.displayName ?? `${scene.leftBoundary?.type}-${index}`,
+                    modelId: instance.modelId ?? null,
+                    modelUrl: instance.modelUrl ?? null,
+                    width: instance.width ?? null,
+                    height: instance.height ?? null,
+                    depth: instance.depth ?? null
+                }
             });
         });
 
         if (scene.rightBoundary?.supportSurface) {
             result.push({
                 key: `right-support-${scene.rightBoundary.boundaryId}`,
-                instance: scene.rightBoundary.supportSurface
+                instance: scene.rightBoundary.supportSurface,
+                meta: {
+                    selectionId: `right-support-${scene.rightBoundary.boundaryId}`,
+                    kind: 'boundary-instance',
+                    semanticType: scene.rightBoundary.type,
+                    displayName: `${scene.rightBoundary.type}-support`,
+                    modelId: scene.rightBoundary.supportSurface.modelId ?? null,
+                    modelUrl: scene.rightBoundary.supportSurface.modelUrl ?? null,
+                    width: scene.rightBoundary.supportSurface.width ?? null,
+                    height: scene.rightBoundary.supportSurface.height ?? null,
+                    depth: scene.rightBoundary.supportSurface.depth ?? null
+                }
             });
         }
 
         scene.rightBoundary?.instances?.forEach((instance, index) => {
             result.push({
                 key: `right-instance-${scene.rightBoundary?.boundaryId}-${index}`,
-                instance
+                instance,
+                meta: {
+                    selectionId: `right-instance-${scene.rightBoundary?.boundaryId}-${index}`,
+                    kind: 'boundary-instance',
+                    semanticType: scene.rightBoundary?.type,
+                    displayName: instance.displayName ?? `${scene.rightBoundary?.type}-${index}`,
+                    modelId: instance.modelId ?? null,
+                    modelUrl: instance.modelUrl ?? null,
+                    width: instance.width ?? null,
+                    height: instance.height ?? null,
+                    depth: instance.depth ?? null
+                }
             });
         });
 
         return result;
     }, [sceneData]);
+
+    const handleModelReady = () => {
+        controllerRef.current?.refreshSelected?.();
+    };
 
     if (!aframeReady) {
         return (
@@ -295,6 +415,12 @@ export default function ModelContainer({
                 ...style
             }}
         >
+            <SelectionInfoPanel
+                visible={visibleRight}
+                selected={selected}
+                onHide={() => setVisibleRight(false)}
+            />
+
             <div
                 style={{
                     position: 'absolute',
@@ -320,6 +446,7 @@ export default function ModelContainer({
             </div>
 
             <a-scene
+                ref={sceneRef}
                 embedded
                 renderer="colorManagement: true; physicallyCorrectLights: true; antialias: true; shadowMapEnabled: true; shadowMapType: pcfsoft"
                 shadow="type: pcfsoft"
@@ -343,7 +470,6 @@ export default function ModelContainer({
 
                 <StreetSceneLights styleInfo={styleInfo} />
 
-                {/* base */}
                 <a-box
                     position={vectorToString(base.position)}
                     width={base.width + 110}
@@ -354,7 +480,6 @@ export default function ModelContainer({
                     shadow="cast: false; receive: true"
                 />
 
-                {/* segment surfaces */}
                 {scene.segments.map((segment) => (
                     <a-box
                         key={`surface-${segment.segmentId}`}
@@ -365,26 +490,50 @@ export default function ModelContainer({
                         color={segment.surface.color}
                         opacity="0.96"
                         shadow="cast: false; receive: true"
+                        data-selectable="true"
+                        data-selection-meta={serializeMeta({
+                            selectionId: `surface-${segment.segmentId}`,
+                            kind: 'segment-surface',
+                            semanticType: segment.type,
+                            displayName: `${segment.type}-surface`
+                        })}
                     />
                 ))}
 
-                {/* segment instances */}
                 {scene.segments.flatMap((segment) =>
-                    (segment.instances || []).map((instance, index) => (
-                        <SceneInstanceRenderer
-                            key={`instance-${segment.segmentId}-${index}`}
-                            instanceKey={`instance-${segment.segmentId}-${index}`}
-                            instance={instance}
-                        />
-                    ))
+                    (segment.instances || []).map((instance, index) => {
+                        const key = `instance-${segment.segmentId}-${index}`;
+                        const meta: SelectableMeta = {
+                            selectionId: key,
+                            kind: 'segment-instance',
+                            semanticType: instance.semanticType || segment.type,
+                            displayName: instance.displayName ?? `${segment.type}-${index}`,
+                            modelId: instance.modelId ?? null,
+                            modelUrl: instance.modelUrl ?? null,
+                            width: instance.width ?? null,
+                            height: instance.height ?? null,
+                            depth: instance.depth ?? null
+                        };
+
+                        return (
+                            <SceneInstanceRenderer
+                                key={key}
+                                instanceKey={key}
+                                instance={instance}
+                                meta={meta}
+                                onModelReady={handleModelReady}
+                            />
+                        );
+                    })
                 )}
 
-                {/* boundary supports + boundary models */}
-                {allBoundaryInstances.map(({ key, instance }) => (
+                {allBoundaryInstances.map(({ key, instance, meta }) => (
                     <SceneInstanceRenderer
                         key={key}
                         instanceKey={key}
                         instance={instance}
+                        meta={meta}
+                        onModelReady={handleModelReady}
                     />
                 ))}
             </a-scene>

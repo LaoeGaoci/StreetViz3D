@@ -1,0 +1,38 @@
+.selection-info-sidebar {
+  margin-top: $topbarHeight + 5rem;
+  width: 360px;
+}
+
+.selection-info-empty {
+  line-height: 1.8;
+  color: #6b7280;
+}
+
+.selection-info-empty__title {
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.selection-info-content {
+  line-height: 1.9;
+  font-size: 14px;
+}
+
+.selection-info-section {
+  margin-top: 18px;
+  margin-bottom: 8px;
+}
+
+.selection-info-section--first {
+  margin-top: 0;
+  margin-bottom: 12px;
+}
+
+.selection-info-section__title {
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.selection-info-row {
+  word-break: break-all;
+}
