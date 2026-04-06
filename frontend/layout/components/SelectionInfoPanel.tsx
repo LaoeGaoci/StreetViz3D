@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Sidebar } from 'primereact/sidebar';
-import { SelectionPayload } from './aframe-selection';
+import { SelectionPayload } from '../utils/aframe-selection';
 
 interface Props {
     visible: boolean;

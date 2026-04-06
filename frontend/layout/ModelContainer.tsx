@@ -1,14 +1,20 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Button } from 'primereact/button';
 import {
     resolveModelUrl,
     SceneInstanceDTO,
     StreetSceneDTO
 } from '@/app/api/street';
-import StreetSceneLights from './StreetSceneLights';
-import SelectionInfoPanel from './SelectionInfoPanel';
-import { createSelectionController, SelectionPayload, SelectableMeta } from './aframe-selection';
+import StreetSceneLights from './components/StreetSceneLights';
+import SelectionInfoPanel from './components/SelectionInfoPanel';
+import {
+    createSelectionController,
+    InteractionMode,
+    SelectionPayload,
+    SelectableMeta
+} from './utils/aframe-selection';
 import 'aframe';
 
 const SELECT_NODE_EVENT = 'streetviz3d:select-node';
@@ -25,7 +31,8 @@ if (
             speed: { type: 'number', default: 6 },
             upKey: { type: 'string', default: 'Space' },
             downKey: { type: 'string', default: 'ShiftLeft' },
-            downKey2: { type: 'string', default: 'ShiftRight' }
+            downKey2: { type: 'string', default: 'ShiftRight' },
+            enabled: { type: 'boolean', default: true }
         },
 
         init() {
@@ -44,6 +51,8 @@ if (
         },
 
         tick(_time: number, delta: number) {
+            if (!this.data.enabled) return;
+
             const el = this.el;
             const pos = el.getAttribute('position');
             if (!pos) return;
@@ -86,6 +95,16 @@ interface GltfEntityProps {
     scale?: string;
     meta: SelectableMeta;
     onModelReady?: () => void;
+}
+
+interface SelectionControllerHandle {
+    clearSelection?: () => void;
+    refreshSelected?: () => void;
+    selectBySelectionId?: (selectionId: string) => SelectionPayload | null;
+    focusSelected?: (options?: { distanceMultiplier?: number }) => void;
+    setInteractionMode?: (mode: InteractionMode) => void;
+    getInteractionMode?: () => InteractionMode;
+    destroy?: () => void;
 }
 
 function vectorToString(
@@ -243,8 +262,10 @@ export default function ModelContainer({
     const [aframeReady, setAframeReady] = useState(false);
     const [selected, setSelected] = useState<SelectionPayload | null>(null);
     const [visibleRight, setVisibleRight] = useState(false);
+    const [interactionMode, setInteractionMode] = useState<InteractionMode>('view');
+
     const sceneRef = useRef<any>(null);
-    const controllerRef = useRef<any>(null);
+    const controllerRef = useRef<SelectionControllerHandle | null>(null);
 
     useEffect(() => {
         let mounted = true;
@@ -283,6 +304,8 @@ export default function ModelContainer({
                 },
                 onHover: () => { }
             });
+
+            controllerRef.current?.setInteractionMode?.('view');
         };
 
         if (sceneEl.hasLoaded) {
@@ -294,7 +317,7 @@ export default function ModelContainer({
         return () => {
             destroyed = true;
             if (controllerRef.current) {
-                controllerRef.current.destroy();
+                controllerRef.current.destroy?.();
                 controllerRef.current = null;
             }
         };
@@ -330,6 +353,11 @@ export default function ModelContainer({
             window.removeEventListener(SELECT_NODE_EVENT, handleExternalSelect);
         };
     }, []);
+
+    const handleModeChange = (mode: InteractionMode) => {
+        setInteractionMode(mode);
+        controllerRef.current?.setInteractionMode?.(mode);
+    };
 
     const allBoundaryInstances = useMemo(() => {
         const scene = sceneData;
@@ -443,7 +471,6 @@ export default function ModelContainer({
                 minHeight: 520,
                 position: 'relative',
                 overflow: 'hidden',
-                borderRadius: 18,
                 background: '#000',
                 ...style
             }}
@@ -454,28 +481,41 @@ export default function ModelContainer({
                 onHide={() => setVisibleRight(false)}
             />
 
-            <div
-                style={{
-                    position: 'absolute',
-                    top: 12,
-                    right: 12,
-                    zIndex: 20,
-                    background: 'rgba(17,24,39,0.72)',
-                    backdropFilter: 'blur(8px)',
-                    color: '#f9fafb',
-                    padding: '10px 14px',
-                    borderRadius: 12,
-                    fontSize: 13,
-                    lineHeight: 1.5,
-                    boxShadow: '0 6px 20px rgba(0,0,0,0.24)',
-                    maxWidth: 360
-                }}
-            >
-                <div style={{ fontWeight: 700 }}>{scene.streetName}</div>
+            <div className="model-container__mode-toolbar">
+                <ModeButton
+                    active={interactionMode === 'view'}
+                    title="正常视角移动"
+                    icon="pi pi-eye"
+                    onClick={() => handleModeChange('view')}
+                />
+                <ModeButton
+                    active={interactionMode === 'move'}
+                    title="模型移动"
+                    icon="pi pi-arrows-alt"
+                    onClick={() => handleModeChange('move')}
+                />
+                <ModeButton
+                    active={interactionMode === 'rotate'}
+                    title="模型旋转"
+                    icon="pi pi-refresh"
+                    onClick={() => handleModeChange('rotate')}
+                />
+            </div>
+
+            <div className="model-container__scene-info">
+                <div className="model-container__scene-title">{scene.streetName}</div>
                 <div>street width: {scene.streetWidth} m</div>
                 <div>road length: {scene.roadLength} m</div>
                 <div>segments: {scene.segments.length}</div>
                 <div>sky: {styleInfo?.skyColor || '#e7eff6'}</div>
+                <div className="model-container__scene-mode">
+                    mode:{' '}
+                    {interactionMode === 'view'
+                        ? 'view'
+                        : interactionMode === 'move'
+                            ? 'move'
+                            : 'rotate'}
+                </div>
             </div>
 
             <a-scene
@@ -492,7 +532,7 @@ export default function ModelContainer({
             >
                 <a-sky color={styleInfo?.skyColor || '#e4ecf6'} />
 
-                <a-entity position="0 14 22" fly-controls-y="speed: 8">
+                <a-entity position="0 14 22" fly-controls-y="speed: 8; enabled: true">
                     <a-camera
                         wasd-controls-enabled="true"
                         look-controls-enabled="true"
@@ -574,6 +614,32 @@ export default function ModelContainer({
     );
 }
 
+function ModeButton({
+    active,
+    title,
+    icon,
+    onClick
+}: {
+    active: boolean;
+    title: string;
+    icon: string;
+    onClick: () => void;
+}) {
+    return (
+        <Button
+            type="button"
+            tooltip={title}
+            tooltipOptions={{ position: 'bottom' }}
+            onClick={onClick}
+            icon={icon}
+            text
+            rounded
+            aria-label={title}
+            className="model-container__mode-button"
+        />
+    );
+}
+
 function fallbackStyle(
     background: string,
     color: string,
@@ -590,7 +656,6 @@ function fallbackStyle(
         background,
         color,
         borderRadius: 16,
-        padding: isError ? 24 : undefined,
         textAlign: isError ? 'center' : undefined,
         ...style
     };

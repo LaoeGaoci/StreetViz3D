@@ -7,7 +7,7 @@ import { MenuProvider } from './context/menucontext';
 import { AppMenuItem } from '@/types';
 import AppFooter from './AppFooter';
 import { StreetSceneDTO } from '@/app/api/street';
-import { buildSceneTree } from './buildSceneTree';
+import { buildSceneTree } from './utils/buildSceneTree';
 
 const SCENE_STORAGE_KEY = 'streetviz3d-current-scene';
 const SCENE_UPDATED_EVENT = 'streetviz3d:scene-updated';
