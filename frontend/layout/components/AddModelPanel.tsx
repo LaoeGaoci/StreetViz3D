@@ -6,6 +6,7 @@ import { TabMenu } from 'primereact/tabmenu';
 import { ScrollPanel } from 'primereact/scrollpanel';
 import { Button } from 'primereact/button';
 import { Card } from 'primereact/card';
+import UserModelUploadDialog from './user/UserModelUploadDialog';
 
 interface Props {
     visible: boolean;
@@ -32,7 +33,6 @@ const categories: CategoryItem[] = [
     { label: '🏢Buildings', type: 'Building' }
 ];
 
-// 你的后端地址
 const API_BASE_URL = 'http://localhost:8080';
 
 export default function AddModelPanel({ visible, onHide }: Props) {
@@ -40,6 +40,7 @@ export default function AddModelPanel({ visible, onHide }: Props) {
     const [models, setModels] = useState<ModelItem[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string>('');
+    const [uploadDialogVisible, setUploadDialogVisible] = useState(false);
 
     const items = useMemo(
         () => categories.map((c) => ({ label: c.label })),
@@ -49,110 +50,123 @@ export default function AddModelPanel({ visible, onHide }: Props) {
     const currentCategory = categories[activeIndex];
     const currentType = currentCategory.type;
 
+    const fetchModels = async () => {
+        setLoading(true);
+        setError('');
+
+        try {
+            const response = await fetch(
+                `${API_BASE_URL}/model/type?type=${encodeURIComponent(currentType)}`,
+                {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
+
+            if (!response.ok) {
+                throw new Error(`请求失败，状态码：${response.status}`);
+            }
+
+            const data: ModelItem[] = await response.json();
+            setModels(data);
+        } catch (err) {
+            console.error('获取模型列表失败：', err);
+            setError('模型数据加载失败');
+            setModels([]);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     useEffect(() => {
         if (!visible) return;
-
-        const fetchModels = async () => {
-            setLoading(true);
-            setError('');
-
-            try {
-                const response = await fetch(
-                    `${API_BASE_URL}/model/type?type=${encodeURIComponent(currentType)}`,
-                    {
-                        method: 'GET',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        }
-                    }
-                );
-
-                if (!response.ok) {
-                    throw new Error(`请求失败，状态码：${response.status}`);
-                }
-
-                const data: ModelItem[] = await response.json();
-                console.log('获取模型列表成功：', data);
-                setModels(data);
-            } catch (err) {
-                console.error('获取模型列表失败：', err);
-                setError('模型数据加载失败');
-                setModels([]);
-            } finally {
-                setLoading(false);
-            }
-        };
-
         fetchModels();
     }, [visible, currentType]);
 
     return (
-        <Sidebar
-            visible={visible}
-            position="bottom"
-            onHide={onHide}
-            className="streetviz-addmodel"
-            showCloseIcon={false}
-        >
-            <div className="panel-header">
-                <TabMenu
-                    model={items}
-                    activeIndex={activeIndex}
-                    onTabChange={(e) => setActiveIndex(e.index)}
-                />
+        <>
+            <UserModelUploadDialog
+                visible={uploadDialogVisible}
+                onHide={() => setUploadDialogVisible(false)}
+                onUploaded={() => {
+                    setUploadDialogVisible(false);
+                }}
+            />
 
-                <div className="panel-close">
-                    <Button
-                        icon="pi pi-times"
-                        className="p-button-primary"
-                        onClick={onHide}
+            <Sidebar
+                visible={visible}
+                position="bottom"
+                onHide={onHide}
+                className="streetviz-addmodel"
+                showCloseIcon={false}
+            >
+                <div className="panel-header">
+                    <TabMenu
+                        model={items}
+                        activeIndex={activeIndex}
+                        onTabChange={(e) => setActiveIndex(e.index)}
                     />
+
+                    <div className="flex align-items-center gap-3 panel-close">
+                        <Button
+                            label="上传模型"
+                            icon="pi pi-upload"
+                            onClick={() => setUploadDialogVisible(true)}
+                        />
+                        <Button
+                            icon="pi pi-times"
+                            className="p-button-primary"
+                            onClick={onHide}
+                        />
+                    </div>
                 </div>
-            </div>
 
-            <ScrollPanel className="model-scroll-panel">
-                <div className="model-grid">
-                    {loading && (
-                        <div className="model-status">
-                            正在加载模型...
-                        </div>
-                    )}
+                <ScrollPanel className="model-scroll-panel">
+                    <div className="model-grid">
+                        {loading && (
+                            <div className="model-status">
+                                正在加载模型...
+                            </div>
+                        )}
 
-                    {!loading && error && (
-                        <div className="model-status error">
-                            {error}
-                        </div>
-                    )}
+                        {!loading && error && (
+                            <div className="model-status error">
+                                {error}
+                            </div>
+                        )}
 
-                    {!loading && !error && models.length === 0 && (
-                        <div className="model-status">
-                            当前分类下暂无模型
-                        </div>
-                    )}
+                        {!loading && !error && models.length === 0 && (
+                            <div className="model-status">
+                                当前分类下暂无模型
+                            </div>
+                        )}
 
-                    {!loading &&
-                        !error &&
-                        models.map((m) => (
-                            <Card
-                                key={m.modelId}
-                                className="model-card"
-                                header={
-                                    <div className="model-image-wrapper">
-                                        <img
-                                            src={m.modelPreview}
-                                            alt={m.displayName}
-                                            className="model-image"
-                                        />
+                        {!loading &&
+                            !error &&
+                            models.map((m) => (
+                                <Card
+                                    key={m.modelId}
+                                    className="model-card"
+                                    header={
+                                        <div className="model-image-wrapper">
+                                            <img
+                                                src={m.modelPreview}
+                                                alt={m.displayName}
+                                                className="model-image"
+                                            />
+                                        </div>
+                                    }
+                                >
+                                    <div className="model-title">
+                                        {m.displayName}
                                     </div>
-                                }
-                            >
-                                <div className="model-title">
-                                    {m.displayName}
-                                </div>
-                            </Card>
-                        ))}
-                </div>
-            </ScrollPanel>
-        </Sidebar>
+                                </Card>
+                            ))}
+                    </div>
+                </ScrollPanel>
+            </Sidebar>
+        </>
     );
 }
