@@ -1,63 +1,64 @@
+import {
+    UpdateUserModelPublicRequest,
+    UploadUserModelRequest,
+    UserUploadedModelResponse
+} from '@/types/auth/userModel';
+import {
+    UpdatePasswordRequest,
+    UserInfo,
+    UserStreetItem
+} from '@/types/auth/user';
+
 export const API_BASE_URL = 'http://localhost:8080';
 
-export interface UserInfo {
-    userId: string;
-    userName: string;
-    avatarUrl: string;
-    email: string;
-    createdAt: string;
-    updatedAt: string;
-}
-
+/**
+ * 后端统一响应结构
+ */
 interface ApiResponse<T> {
     code: number;
     message?: string;
     data: T;
 }
 
-export interface UpdateAvatarRequest {
-    userId: string;
-    avatarUrl: string;
-}
-
-export interface UpdatePasswordRequest {
-    userId: string;
-    oldPassword: string;
-    newPassword: string;
-}
-export interface UserStreetItem {
-    streetId: string;
-    streetName: string;
-    width: number;
-    createdAt: string;
-    updatedAt: string;
-}
 /**
- * 用户街道列表项
- * 对应后端：
- * GET /api/streets/user/{userId}
+ * 创建模型草稿响应
  */
-export interface UserStreetItem {
-    streetId: string;
-    streetName: string;
-    width: number;
-    createdAt: string;
-    updatedAt: string;
+export interface CreateUserModelDraftResponse {
+    uploadId: string;
 }
 
+/**
+ * 统一解析接口响应
+ */
+async function parseApiResponse<T>(response: Response, defaultMessage: string): Promise<T> {
+    let result: ApiResponse<T>;
 
-export async function getUserInfo(userId: string): Promise<UserInfo> {
-    const response = await fetch(`${API_BASE_URL}/user/info?userId=${encodeURIComponent(userId)}`, {
-        method: 'GET'
-    });
-
-    const result: ApiResponse<UserInfo> = await response.json();
+    try {
+        result = await response.json();
+    } catch {
+        throw new Error(defaultMessage);
+    }
 
     if (!response.ok || result.code !== 200) {
-        throw new Error(result.message || '获取用户信息失败');
+        throw new Error(result.message || defaultMessage);
     }
 
     return result.data;
+}
+
+/* =========================
+ * 用户基础信息
+ * ========================= */
+
+export async function getUserInfo(userId: string): Promise<UserInfo> {
+    const response = await fetch(
+        `${API_BASE_URL}/user/info?userId=${encodeURIComponent(userId)}`,
+        {
+            method: 'GET'
+        }
+    );
+
+    return parseApiResponse<UserInfo>(response, '获取用户信息失败');
 }
 
 export async function updatePassword(request: UpdatePasswordRequest): Promise<void> {
@@ -69,28 +70,9 @@ export async function updatePassword(request: UpdatePasswordRequest): Promise<vo
         body: JSON.stringify(request)
     });
 
-    const result: ApiResponse<null> = await response.json();
-
-    if (!response.ok || result.code !== 200) {
-        throw new Error(result.message || '修改密码失败');
-    }
+    await parseApiResponse<null>(response, '修改密码失败');
 }
 
-/**
- * 上传用户头像文件
- *
- * 功能说明：
- * 1. 前端将 userId 与头像文件一起提交给后端；
- * 2. 后端负责将文件保存到 Nginx 静态目录；
- * 3. 后端负责将相对路径 avatar/{userId}.{ext} 存入数据库；
- * 4. 接口最终返回完整可访问的头像 URL。
- *
- * @param userId 当前用户 ID
- * @param file 用户选择的头像文件
- * @returns 上传成功后的完整头像访问地址，例如：
- * http://localhost:65/auth/avatar/{userId}.png
- * @throws 当接口响应失败或业务状态码不是 200 时抛出异常
- */
 export async function uploadAvatarFile(userId: string, file: File): Promise<string> {
     const formData = new FormData();
     formData.append('userId', userId);
@@ -101,13 +83,7 @@ export async function uploadAvatarFile(userId: string, file: File): Promise<stri
         body: formData
     });
 
-    const result: ApiResponse<string> = await response.json();
-
-    if (!response.ok || result.code !== 200) {
-        throw new Error(result.message || '上传头像失败');
-    }
-
-    return result.data;
+    return parseApiResponse<string>(response, '上传头像失败');
 }
 
 export async function getUserIdFromEmail(): Promise<string> {
@@ -124,15 +100,10 @@ export async function getUserIdFromEmail(): Promise<string> {
         }
     );
 
-    const result = await response.json();
+    const data = await parseApiResponse<{ userId: string }>(response, '获取用户ID失败');
+    const userId = data.userId;
 
-    if (!response.ok || result.code !== 200) {
-        throw new Error(result.message || '获取用户ID失败');
-    }
-
-    const userId = result.data.userId;
     localStorage.setItem('userId', userId);
-
     return userId;
 }
 
@@ -144,11 +115,124 @@ export async function getUserStreetList(userId: string): Promise<UserStreetItem[
         }
     );
 
-    const result: ApiResponse<UserStreetItem[]> = await response.json();
+    return parseApiResponse<UserStreetItem[]>(response, '获取用户街道列表失败');
+}
 
-    if (!response.ok || result.code !== 200) {
-        throw new Error(result.message || '获取用户街道列表失败');
+/* =========================
+ * 用户模型
+ * ========================= */
+
+/**
+ * 第一步：创建模型草稿
+ * POST /user/model
+ */
+export async function createUserModelDraft(
+    request: UploadUserModelRequest
+): Promise<CreateUserModelDraftResponse> {
+    const response = await fetch(`${API_BASE_URL}/user/model`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(request)
+    });
+
+    return parseApiResponse<CreateUserModelDraftResponse>(response, '创建模型草稿失败');
+}
+
+/**
+ * 第二步：上传模型文件
+ * POST /user/model/files
+ *
+ * 注意：
+ * 1. 不要手动设置 Content-Type
+ * 2. 让浏览器自动为 FormData 补充 multipart boundary
+ */
+export async function uploadUserModelFiles(params: {
+    userId: string;
+    uploadId: string;
+    gltfFile: File;
+    binFile?: File | null;
+    textureFiles?: File[];
+    previewFile?: File | null;
+}): Promise<UserUploadedModelResponse> {
+    const formData = new FormData();
+    formData.append('userId', params.userId);
+    formData.append('uploadId', params.uploadId);
+    formData.append('gltfFile', params.gltfFile);
+
+    if (params.binFile) {
+        formData.append('binFile', params.binFile);
     }
 
-    return result.data;
+    if (params.textureFiles?.length) {
+        params.textureFiles.forEach((file) => {
+            formData.append('textureFiles', file);
+        });
+    }
+
+    if (params.previewFile) {
+        formData.append('previewFile', params.previewFile);
+    }
+
+    const response = await fetch(`${API_BASE_URL}/user/model/files`, {
+        method: 'POST',
+        body: formData
+    });
+
+    return parseApiResponse<UserUploadedModelResponse>(response, '上传模型文件失败');
+}
+
+export async function deleteUserModel(userId: string, uploadId: string): Promise<void> {
+    const response = await fetch(
+        `${API_BASE_URL}/user/model?userId=${encodeURIComponent(userId)}&uploadId=${encodeURIComponent(uploadId)}`,
+        {
+            method: 'DELETE'
+        }
+    );
+
+    await parseApiResponse<null>(response, '删除用户模型失败');
+}
+
+export async function getUserUploadedModelList(userId: string): Promise<UserUploadedModelResponse[]> {
+    const response = await fetch(
+        `${API_BASE_URL}/user/model/list?userId=${encodeURIComponent(userId)}`,
+        {
+            method: 'GET'
+        }
+    );
+
+    return parseApiResponse<UserUploadedModelResponse[]>(response, '获取用户上传模型列表失败');
+}
+
+export async function updateUserModelPublicStatus(
+    request: UpdateUserModelPublicRequest
+): Promise<UserUploadedModelResponse> {
+    const response = await fetch(`${API_BASE_URL}/user/model/public`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(request)
+    });
+
+    return parseApiResponse<UserUploadedModelResponse>(response, '修改用户模型公开状态失败');
+}
+
+export async function updateUserModelPreview(
+    userId: string,
+    uploadId: string,
+    previewFile: File
+): Promise<UserUploadedModelResponse> {
+    const formData = new FormData();
+    formData.append('userId', userId);
+    formData.append('uploadId', uploadId);
+    formData.append('previewFile', previewFile);
+
+    const response = await fetch(`${API_BASE_URL}/user/model/preview`, {
+        method: 'PUT',
+        body: formData
+    });
+
+    return parseApiResponse<UserUploadedModelResponse>(response, '修改用户模型预览图失败');
 }

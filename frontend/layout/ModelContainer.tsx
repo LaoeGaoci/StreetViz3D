@@ -2,11 +2,8 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from 'primereact/button';
-import {
-    resolveModelUrl,
-    SceneInstanceDTO,
-    StreetSceneDTO
-} from '@/app/api/street';
+import {SceneInstanceDTO, StreetSceneDTO } from '@/types/street/street';
+import { resolveModelUrl } from '@/app/api/street';
 import StreetSceneLights from './components/StreetSceneLights';
 import SelectionInfoPanel from './components/SelectionInfoPanel';
 import {
