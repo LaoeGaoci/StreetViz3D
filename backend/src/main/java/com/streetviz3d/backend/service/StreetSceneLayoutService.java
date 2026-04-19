@@ -6,12 +6,15 @@ import com.streetviz3d.backend.dto.response.StreetPreviewResponse;
 import com.streetviz3d.backend.dto.scene.*;
 import com.streetviz3d.backend.dto.street.BoundaryPreviewDTO;
 import com.streetviz3d.backend.dto.street.SegmentPreviewDTO;
+import com.streetviz3d.backend.entity.LayoutGA;
 import com.streetviz3d.backend.entity.ModelAsset;
 import com.streetviz3d.backend.mapper.ModelAssetMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
@@ -203,184 +206,100 @@ public class StreetSceneLayoutService {
         JsonNode variantData = segment.getVariantData();
         double elevation = safeElevation(segment.getElevation());
 
-        if ("drive-lane".equals(type)) {
-            String vehicleType = readText(variantData, "vehicleType");
-            String flowDirection = readText(variantData, "flowDirection");
-            double rotationY = "inbound".equalsIgnoreCase(flowDirection) ? 0.0 : 180.0;
+        double[] defaultZ;
+        int count;
+        double offsetX = 0.0;
+        double baseY;
 
-            double[] zPositions = new double[]{-16.0, 14.0};
-            for (double z : zPositions) {
-                SceneInstanceDTO vehicle = createSegmentInstance(
-                        segment,
-                        "model",
-                        "drive-lane-" + safeText(vehicleType, "vehicle"),
-                        centerX,
-                        0.22 + elevation,
-                        z,
-                        rotationY
-                );
-                vehicle.setColor("#9ca3af");
-                vehicle.setWidth(1.9);
-                vehicle.setHeight(1.6);
-                vehicle.setDepth(4.8);
-                instances.add(vehicle);
-            }
-            return;
+        switch (type) {
+            case "drive-lane":
+                count = 4;
+                defaultZ = new double[]{-16.0, 14.0};
+                break;
+            case "bus-lane":
+                count = 1;
+                defaultZ = new double[]{0.0};
+                break;
+            case "parking-lane":
+                count = 4;
+                defaultZ = new double[]{-22.0, -8.0, 8.0, 22.0};
+                offsetX = "left".equalsIgnoreCase(readText(variantData, "placementSide")) ? -0.2 : 0.2;
+                break;
+            case "flex-zone":
+                count = 5;
+                offsetX = "left".equalsIgnoreCase(readText(variantData, "placementSide")) ? -0.15 : 0.15;
+                break;
+            case "temporary":
+                count = (int)Math.floor(roadLength / 10.0);
+                break;
+            case "sidewalk-tree":
+                count = (int)Math.floor(roadLength / 8.0);
+                break;
+            case "sidewalk":
+                // 根据 pedestrianDensity 决定数量
+                String density = readText(variantData, "pedestrianDensity");
+                if ("empty".equalsIgnoreCase(density)) return;
+                switch(density.toLowerCase()) {
+                    case "dense": defaultZ = new double[]{-20, -12, -4, 4, 12, 20}; break;
+                    case "normal": defaultZ = new double[]{-14, -2, 10}; break;
+                    case "sparse": defaultZ = new double[]{0}; break;
+                    default: defaultZ = new double[]{}; break;
+                }
+                count = defaultZ.length;
+                break;
+            default: return;
         }
 
-        if ("bus-lane".equals(type)) {
-            String flowDirection = readText(variantData, "flowDirection");
-            double rotationY = "inbound".equalsIgnoreCase(flowDirection) ? 0.0 : 180.0;
+        // 使用 GA 优化 Z 轴
+        double[] modelDepths = new double[count];
+        Arrays.fill(modelDepths, 5.0); // 可以根据模型类型定深度
+        double[] optimizedZ = {0.0};
+        try {
+            optimizedZ = LayoutGA.optimizeZPositionsGA(count, roadLength, 2.0, modelDepths, 500, 100);
+        } catch (IOException e) {
+            // 记录异常并回退到默认 Z 轴位置
+            System.err.println("GA Z 轴优化失败: " + e.getMessage());
+        }
 
-            SceneInstanceDTO bus = createSegmentInstance(
+        baseY = switch(type) {
+            case "drive-lane" -> 0.22 + elevation;
+            case "bus-lane" -> 0.28 + elevation;
+            case "parking-lane" -> 0.18 + elevation;
+            case "flex-zone" -> 0.2 + elevation;
+            case "temporary" -> 0.12 + elevation;
+            case "sidewalk-tree" -> 0.28 + elevation;
+            case "sidewalk" -> 0.18 + elevation;
+            default -> elevation;
+        };
+
+        double rotationY = resolveSegmentRotationY(segment);
+
+        for (int i = 0; i < count; i++) {
+            SceneInstanceDTO instance = createSegmentInstance(
                     segment,
                     "model",
-                    "bus-lane-bus",
-                    centerX,
-                    0.28 + elevation,
-                    0,
+                    type + "-instance",
+                    centerX + offsetX,
+                    baseY,
+                    optimizedZ[i],
                     rotationY
             );
-            bus.setColor("#ef4444");
-            bus.setWidth(2.6);
-            bus.setHeight(2.9);
-            bus.setDepth(10.5);
-            instances.add(bus);
-            return;
+
+            // 设置尺寸和颜色
+            setInstanceSizeAndColor(type, instance);
+            instances.add(instance);
         }
+    }
 
-        if ("parking-lane".equals(type)) {
-            String parkingDirection = readText(variantData, "parkingDirection");
-            String placementSide = readText(variantData, "placementSide");
-
-            double rotationY = "inbound".equalsIgnoreCase(parkingDirection) ? 180.0 : 0;
-            double offsetX = "left".equalsIgnoreCase(placementSide) ? -0.2 : 0.2;
-
-            double[] zPositions = new double[]{-22.0, -8.0, 8.0, 22.0};
-            for (double z : zPositions) {
-                SceneInstanceDTO parkedCar = createSegmentInstance(
-                        segment,
-                        "model",
-                        "parking-lane-parked-car",
-                        centerX + offsetX,
-                        0.18 + elevation,
-                        z,
-                        rotationY
-                );
-                parkedCar.setColor("#6b7280");
-                parkedCar.setWidth(1.9);
-                parkedCar.setHeight(1.6);
-                parkedCar.setDepth(4.8);
-                instances.add(parkedCar);
-            }
-            return;
-        }
-
-        if ("flex-zone".equals(type)) {
-            String flowDirection = readText(variantData, "flowDirection");
-            String placementSide = readText(variantData, "placementSide");
-            double rotationY = "inbound".equalsIgnoreCase(flowDirection) ? 0.0 : 180.0;
-
-            double[] zPositions = new double[]{-12.0, 10.0};
-            double offsetX = "left".equalsIgnoreCase(placementSide) ? -0.15 : 0.15;
-
-            for (double z : zPositions) {
-                SceneInstanceDTO taxi = createSegmentInstance(
-                        segment,
-                        "model",
-                        "flex-zone-taxi",
-                        centerX + offsetX,
-                        0.2 + elevation,
-                        z,
-                        rotationY
-                );
-                taxi.setColor("#f59e0b");
-                taxi.setWidth(1.9);
-                taxi.setHeight(1.6);
-                taxi.setDepth(4.8);
-                instances.add(taxi);
-            }
-            return;
-        }
-
-        if ("temporary".equals(type)) {
-            String barrierType = readText(variantData, "barrierType");
-
-            for (double z = -roadLength / 2.0 + 10.0; z <= roadLength / 2.0 - 10.0; z += 10.0) {
-                SceneInstanceDTO cone = createSegmentInstance(
-                        segment,
-                        "model",
-                        "temporary-" + safeText(barrierType, "temporary-object"),
-                        centerX,
-                        0.12 + elevation,
-                        z,
-                        0
-                );
-                cone.setColor("#f97316");
-                cone.setWidth(0.35);
-                cone.setHeight(0.8);
-                cone.setDepth(0.35);
-                instances.add(cone);
-            }
-            return;
-        }
-
-        if ("sidewalk-tree".equals(type)) {
-            String treeType = readText(variantData, "treeType");
-
-            for (double z = -roadLength / 2.0 + 12.0; z <= roadLength / 2.0 - 12.0; z += 14.0) {
-                SceneInstanceDTO tree = createSegmentInstance(
-                        segment,
-                        "model",
-                        "sidewalk-tree-" + safeText(treeType, "tree"),
-                        centerX,
-                        0.28 + elevation,
-                        z,
-                        0
-                );
-                tree.setColor("#65a30d");
-                tree.setWidth(1.2);
-                tree.setHeight(4.5);
-                tree.setDepth(1.2);
-                instances.add(tree);
-            }
-            return;
-        }
-
-        if ("sidewalk".equals(type)) {
-            String pedestrianDensity = readText(variantData, "pedestrianDensity");
-
-            if ("empty".equalsIgnoreCase(pedestrianDensity)) {
-                return;
-            }
-
-            double[] zPositions;
-            if ("dense".equalsIgnoreCase(pedestrianDensity)) {
-                zPositions = new double[]{-20, -12, -4, 4, 12, 20};
-            } else if ("normal".equalsIgnoreCase(pedestrianDensity)) {
-                zPositions = new double[]{-14, -2, 10};
-            } else if ("sparse".equalsIgnoreCase(pedestrianDensity)) {
-                zPositions = new double[]{0};
-            } else {
-                zPositions = new double[]{};
-            }
-
-            for (double z : zPositions) {
-                SceneInstanceDTO pedestrian = createSegmentInstance(
-                        segment,
-                        "model",
-                        "sidewalk-pedestrian",
-                        centerX,
-                        0.18 + elevation,
-                        z,
-                        0
-                );
-                pedestrian.setColor("#60a5fa");
-                pedestrian.setWidth(0.45);
-                pedestrian.setHeight(1.7);
-                pedestrian.setDepth(0.45);
-                instances.add(pedestrian);
-            }
+    private void setInstanceSizeAndColor(String type, SceneInstanceDTO instance) {
+        switch(type) {
+            case "drive-lane": instance.setWidth(1.9); instance.setHeight(1.6); instance.setDepth(4.8); instance.setColor("#9ca3af"); break;
+            case "bus-lane": instance.setWidth(2.6); instance.setHeight(2.9); instance.setDepth(10.5); instance.setColor("#ef4444"); break;
+            case "parking-lane": instance.setWidth(1.9); instance.setHeight(1.6); instance.setDepth(4.8); instance.setColor("#6b7280"); break;
+            case "flex-zone": instance.setWidth(1.9); instance.setHeight(1.6); instance.setDepth(4.8); instance.setColor("#f59e0b"); break;
+            case "temporary": instance.setWidth(0.35); instance.setHeight(0.8); instance.setDepth(0.35); instance.setColor("#f97316"); break;
+            case "sidewalk-tree": instance.setWidth(1.2); instance.setHeight(4.5); instance.setDepth(1.2); instance.setColor("#65a30d"); break;
+            case "sidewalk": instance.setWidth(0.45); instance.setHeight(1.7); instance.setDepth(0.45); instance.setColor("#60a5fa"); break;
         }
     }
 
@@ -814,7 +733,6 @@ public class StreetSceneLayoutService {
         double sideSign = "left".equalsIgnoreCase(side) ? -1.0 : 1.0;
 
         // 保留特殊场景类单模型逻辑
-        // 保留特殊场景类单模型逻辑
         if ("parking-lot".equals(type) || "waterfront".equals(type) || "grass".equals(type)) {
             if (boundary.getModel() == null
                     || boundary.getModel().getModelUrl() == null
@@ -851,7 +769,18 @@ public class StreetSceneLayoutService {
 
         List<ModelAsset> pickedModels = pickRandomModels(candidates, targetCount);
 
-        double[] zPositions = buildBoundaryZPositions(type, targetCount, roadLength, placement);
+        // ========== 新增：提取每个模型的实际深度（考虑 scale） ==========
+        SceneVector3DTO scaleVec = parseVector3(placement.scale, new SceneVector3DTO(1, 1, 1));
+        double scaleZ = scaleVec.getZ();  // Z 轴缩放因子
+        double[] modelDepths = new double[targetCount];
+        for (int i = 0; i < targetCount; i++) {
+            ModelAsset model = pickedModels.get(i);
+            double originalDepth = 10.0; // 默认深度 4 米
+            modelDepths[i] = originalDepth * scaleZ;
+        }
+        // ================================================================
+
+        double[] zPositions = buildBoundaryZPositions(type, targetCount, roadLength, placement, modelDepths);
         double instanceY = baseTopY + supportHeight + placement.modelYOffset;
         SceneVector3DTO rotation = parseVector3(resolveBoundaryRotation(type, side), new SceneVector3DTO(0, 0, 0));
         SceneVector3DTO scale = parseVector3(placement.scale, new SceneVector3DTO(1, 1, 1));
@@ -946,67 +875,29 @@ public class StreetSceneLayoutService {
 
         return results;
     }
+    /**
+     * 使用遗传算法优化 boundary 内模型的 Z 轴位置，考虑每个模型的深度
+     */
     private double[] buildBoundaryZPositions(
             String type,
             int count,
             double roadLength,
-            BoundaryPlacement placement
+            BoundaryPlacement placement,
+            double[] modelDepths   // 新增参数
     ) {
-        double[] zPositions = new double[count];
-        if (count <= 0) {
-            return zPositions;
+        if (count <= 1) return new double[]{0.0};
+
+        // 边界缓冲，可根据类型调整
+        double edgePadding = 2.0;
+        double[] optimizedZ = {0.0};
+        try {
+            optimizedZ = LayoutGA.optimizeZPositionsGA(count, roadLength, 2.0, modelDepths, 500, 100);
+        } catch (IOException e) {
+            // 记录异常并回退到默认 Z 轴位置
+            System.err.println("GA Z 轴优化失败: " + e.getMessage());
         }
-
-        if (count == 1) {
-            zPositions[0] = 0.0;
-            return zPositions;
-        }
-
-        String lower = type == null ? "" : type.trim().toLowerCase();
-
-        // 基础前后安全边距
-        double edgePadding = 5.0;
-        // 根据类型增加额外容错
-        if ("wide".equals(lower)) {
-            edgePadding = 10.0;
-        } else if ("arcade".equals(lower)) {
-            edgePadding = 7.0;
-        } else if ("residential".equals(lower)) {
-            edgePadding = 5.0;
-        } else if ("narrow".equals(lower)) {
-            edgePadding = 2.0;
-        } else if ("fence".equals(lower) || "compound-wall".equals(lower)) {
-            edgePadding = 2.0;
-        } else if ("grass".equals(lower)) {
-            edgePadding = 10.0;
-        }
-        double start = -roadLength / 2.0 + edgePadding;
-        double end = roadLength / 2.0 - edgePadding;
-
-        // 如果安全区被压得太小，强行回退到更保守的分布
-        if (end <= start) {
-            double fallbackSpan = Math.max(8.0, roadLength * 0.2);
-            start = -fallbackSpan / 2.0;
-            end = fallbackSpan / 2.0;
-        }
-
-        // 可用长度
-        double usableLength = end - start;
-
-        // 希望更“紧一些”，不要铺满整个可用区
-        // 只使用 82% 的可用长度，让两端再留一点视觉缓冲
-        double compactRatio = 0.82;
-        double compactSpan = usableLength * compactRatio;
-        double compactStart = -compactSpan / 2.0;
-        double compactEnd = compactSpan / 2.0;
-
-        double step = count == 1 ? 0.0 : (compactEnd - compactStart) / (count - 1);
-
-        for (int i = 0; i < count; i++) {
-            zPositions[i] = compactStart + step * i;
-        }
-
-        return zPositions;
+        // 调用 GA 优化，传入模型深度数组
+        return optimizedZ;
     }
     private String resolveBoundaryRotation(String type, String side) {
         String normalizedType = type == null ? "" : type.trim().toLowerCase();
