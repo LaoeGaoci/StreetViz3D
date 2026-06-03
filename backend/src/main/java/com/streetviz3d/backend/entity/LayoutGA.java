@@ -55,21 +55,21 @@ public class LayoutGA {
                 double[] parent1 = population.get(RANDOM.nextInt(population.size()));
                 double[] parent2 = population.get(RANDOM.nextInt(population.size()));
                 double[] child = crossover(parent1, parent2);
-                mutate(child, roadLength, edgePadding, 0.1);
+                mutate(child, roadLength, edgePadding, 0.05);
                 Arrays.sort(child);
                 population.add(child);
             }
         }
 
-        String fileName = "fitness_curve_" + System.currentTimeMillis() + ".csv";
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(fileName))) {
-            for (int i = 0; i < maxFitnessPerGen.size(); i++) {
-                writer.write((i+1) + "," + maxFitnessPerGen.get(i));
-                writer.newLine();
-            }
-        } catch (IOException e) {
-            System.err.println("写 CSV 出错: " + e.getMessage());
-        }
+//        String fileName = "fitness_curve_" + System.currentTimeMillis() + ".csv";
+//        try (BufferedWriter writer = new BufferedWriter(new FileWriter(fileName))) {
+//            for (int i = 0; i < maxFitnessPerGen.size(); i++) {
+//                writer.write((i+1) + "," + maxFitnessPerGen.get(i));
+//                writer.newLine();
+//            }
+//        } catch (IOException e) {
+//            System.err.println("写 CSV 出错: " + e.getMessage());
+//        }
 
         // 返回适应度最高个体
         return population.stream()
@@ -77,7 +77,45 @@ public class LayoutGA {
                 .orElse(population.get(0));
     }
 
-    private static double fitness(double[] z, double roadLength, double edgePadding, double[] depths) {
+    public static double[] optimizeZPositionsRandomSearch(
+            int count,
+            double roadLength,
+            double edgePadding,
+            double[] modelDepths,
+            int sampleCount
+    ) {
+        if (count <= 1) return new double[]{0.0};
+        if (modelDepths.length != count) {
+            throw new IllegalArgumentException("modelDepths length must equal count");
+        }
+
+        double[] bestIndividual = null;
+        double bestFitness = Double.NEGATIVE_INFINITY;
+        double usableLength = roadLength - 2 * edgePadding;
+
+        for (int i = 0; i < sampleCount; i++) {
+            double[] individual = new double[count];
+
+            for (int j = 0; j < count; j++) {
+                individual[j] = edgePadding
+                        + RANDOM.nextDouble() * usableLength
+                        - roadLength / 2.0;
+            }
+
+            Arrays.sort(individual);
+
+            double currentFitness = fitness(individual, roadLength, edgePadding, modelDepths);
+
+            if (currentFitness > bestFitness) {
+                bestFitness = currentFitness;
+                bestIndividual = individual;
+            }
+        }
+
+        return bestIndividual;
+    }
+
+    public static double fitness(double[] z, double roadLength, double edgePadding, double[] depths) {
         double score = 0.0;
         int n = z.length;
 

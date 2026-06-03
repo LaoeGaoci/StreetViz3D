@@ -115,7 +115,19 @@ export interface BoundarySceneDTO {
     supportSurface: SceneInstanceDTO | null;
     instances: SceneInstanceDTO[];
 }
-
+export interface SceneInstanceDTO {
+    modelUrl?: string;
+    modelId?: string;
+    position: { x: number; y: number; z: number };
+    rotation: { x: number; y: number; z: number };
+    scale?: { x: number; y: number; z: number };
+    width?: number;
+    height?: number;
+    depth?: number;
+    displayName?: string;
+    semanticType?: string;
+    color?: string;
+}
 export interface SceneBaseDTO {
     width: number;
     height: number;

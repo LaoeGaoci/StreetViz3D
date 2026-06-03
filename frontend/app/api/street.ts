@@ -64,3 +64,21 @@ export function resolveModelUrl(modelUrl?: string | null): string | null {
 
     return `${MODEL_BASE_URL}/${modelUrl}`;
 }
+
+
+export async function uploadStreetImage(file: File): Promise<StreetPreviewResponse> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await fetch('/api/street/predict', {
+        method: 'POST',
+        body: formData,
+    });
+
+    if (!response.ok) {
+        throw new Error('上传街道图片失败: ' + response.statusText);
+    }
+
+    const data = await response.json();
+    return data;
+}
