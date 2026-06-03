@@ -849,7 +849,7 @@ public class StreetSceneLayoutService {
             case "fence":
                 return 5;
             case "compound-wall":
-                return 4;
+                return 10;
             default:
                 return Math.max(1, (int) Math.round(roadLength / 24.0));
         }
@@ -891,7 +891,7 @@ public class StreetSceneLayoutService {
         double edgePadding = 2.0;
         double[] optimizedZ = {0.0};
         try {
-            optimizedZ = LayoutGA.optimizeZPositionsGA(count, roadLength, 2.0, modelDepths, 500, 100);
+            optimizedZ = LayoutGA.optimizeZPositionsGA(count, roadLength, 2.0, modelDepths, 120, 60);
         } catch (IOException e) {
             // 记录异常并回退到默认 Z 轴位置
             System.err.println("GA Z 轴优化失败: " + e.getMessage());

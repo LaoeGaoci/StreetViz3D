@@ -1,6 +1,7 @@
 package com.streetviz3d.backend.dto.response;
 
 
+import com.streetviz3d.backend.dto.scene.StreetSceneDTO;
 import com.streetviz3d.backend.dto.street.BoundaryPreviewDTO;
 import com.streetviz3d.backend.dto.street.SegmentPreviewDTO;
 import lombok.Data;
@@ -23,6 +24,7 @@ public class StreetPreviewResponse {
 
     private List<SegmentPreviewDTO> segments;
     private BoundaryMap boundaries;
+    public StreetSceneDTO scene;
 
     @Data
     public static class BoundaryMap {
